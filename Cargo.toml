@@ -1,0 +1,4 @@
+[package]
+name = "strconv"
+version = "0.0.1"
+authors = ["Kang Seonghoon <public+rust@mearie.org>"]
