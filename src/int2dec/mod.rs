@@ -7,10 +7,7 @@ mod digits;
 
 pub mod strategy {
     pub mod naive;
-    pub mod naive_uninit;
     pub mod div100;
-    pub mod div100_uninit;
     pub mod bcd;
-    pub mod bcd_uninit;
 }
 
