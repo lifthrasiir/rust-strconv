@@ -34,14 +34,14 @@ pub fn u16_to_digits(n: u16) -> Digits16 {
     let mut buf: Digits16 = [0, ..NDIGITS16];
     let (n, r) = div_rem(n, 100); buf[ 3] = TENS[r as uint]; buf[ 4] = ONES[r as uint];
     let (n, r) = div_rem(n, 100); buf[ 1] = TENS[r as uint]; buf[ 2] = ONES[r as uint];
-    let r = n;                                               buf[ 0] = ONES[r as uint];
+    let r = n;                                               buf[ 0] = r as u8 + b'0';
     buf
 }
 
 pub fn u8_to_digits(n: u8) -> Digits8 {
     let mut buf: Digits8 = [0, ..NDIGITS8];
     let (n, r) = div_rem(n, 100); buf[ 1] = TENS[r as uint]; buf[ 2] = ONES[r as uint];
-    let r = n;                                               buf[ 0] = ONES[r as uint];
+    let r = n;                                               buf[ 0] = r as u8 + b'0';
     buf
 }
 
