@@ -1,13 +1,13 @@
+use std::mem;
 use std::num::div_rem;
 
 use int2dec::digits::{Digits64, Digits32};
-use int2dec::digits::{NDIGITS64, NDIGITS32};
 use int2dec::digits::{ONES, TENS};
 #[cfg(test)] use int2dec::test;
 
 // http://homepage.cs.uiowa.edu/~jones/bcd/decimal.html#sixtyfour
 pub fn u64_to_digits(n: u64) -> Digits64 {
-    let mut buf: Digits64 = [0, ..NDIGITS64];
+    let mut buf: Digits64 = unsafe {mem::uninitialized()};
 
     let n0 = (n & 0xffff) as u32;
     let n1 = ((n >> 16) & 0xffff) as u32;
@@ -37,7 +37,7 @@ pub fn u64_to_digits(n: u64) -> Digits64 {
 }
 
 pub fn u32_to_digits(n: u32) -> Digits32 {
-    let mut buf: Digits32 = [0, ..NDIGITS32];
+    let mut buf: Digits32 = unsafe {mem::uninitialized()};
 
     let n0 = (n & 0xffff) as u32;
     let n1 = ((n >> 16) & 0xffff) as u32;

@@ -1,0 +1,31 @@
+#!/usr/bin/python
+import sys
+import re
+
+BENCH_PATTERN = re.compile(r'''
+    ^test\ ([A-Za-z_][A-Za-z0-9_]*)::strategy::([A-Za-z_][A-Za-z0-9_]*)::bench_([A-Za-z0-9_]+)\ *
+    \.\.\.\ +bench:\ *([0-9]+)\ ns/iter\ \(\+/-\ ([0-9]+)\)
+''', re.X)
+
+benches = {}
+for line in sys.stdin:
+    m = BENCH_PATTERN.match(line)
+    if not m: continue
+    benches.setdefault(m.group(1), {})\
+           .setdefault(m.group(2), {})[m.group(3)] = '%s (%s)' % (m.group(4), m.group(5))
+
+def natural_key(key):
+    return [int(i) if i.isdigit() else i.lower() for i in re.split(r'([0-9]+)', key)]
+
+for k, v in benches.items():
+    print '## `%s`' % k
+    columns = list(set().union(*[i.keys() for i in v.values()]))
+    columns.sort(key=natural_key)
+    print 'Strategy | %s' % ' | '.join('`%s`' % i for i in columns)
+    print '---------|-%s' % '-|-'.join('-%s-' % ('-'*len(i)) for i in columns)
+    rows = list(v.items())
+    rows.sort(key=lambda (k,_): (not k.lower().startswith('naive'), natural_key(k))) # naive first
+    for strategy, results in rows:
+        print '`%s` | %s' % (strategy, ' | '.join(results.get(i, 'N/A') for i in columns))
+    print
+

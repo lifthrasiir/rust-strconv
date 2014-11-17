@@ -1,12 +1,12 @@
+use std::mem;
 use std::num::div_rem;
 
 use int2dec::digits::{Digits64, Digits32, Digits16, Digits8};
-use int2dec::digits::{NDIGITS64, NDIGITS32, NDIGITS16, NDIGITS8};
 use int2dec::digits::{ONES, TENS};
 #[cfg(test)] use int2dec::test;
 
 pub fn u64_to_digits(n: u64) -> Digits64 {
-    let mut buf: Digits64 = [0, ..NDIGITS64];
+    let mut buf: Digits64 = unsafe {mem::uninitialized()};
     let (n, r) = div_rem(n, 100); buf[18] = TENS[r as uint]; buf[19] = ONES[r as uint];
     let (n, r) = div_rem(n, 100); buf[16] = TENS[r as uint]; buf[17] = ONES[r as uint];
     let (n, r) = div_rem(n, 100); buf[14] = TENS[r as uint]; buf[15] = ONES[r as uint];
@@ -21,7 +21,7 @@ pub fn u64_to_digits(n: u64) -> Digits64 {
 }
 
 pub fn u32_to_digits(n: u32) -> Digits32 {
-    let mut buf: Digits32 = [0, ..NDIGITS32];
+    let mut buf: Digits32 = unsafe {mem::uninitialized()};
     let (n, r) = div_rem(n, 100); buf[ 8] = TENS[r as uint]; buf[ 9] = ONES[r as uint];
     let (n, r) = div_rem(n, 100); buf[ 6] = TENS[r as uint]; buf[ 7] = ONES[r as uint];
     let (n, r) = div_rem(n, 100); buf[ 4] = TENS[r as uint]; buf[ 5] = ONES[r as uint];
@@ -31,7 +31,7 @@ pub fn u32_to_digits(n: u32) -> Digits32 {
 }
 
 pub fn u16_to_digits(n: u16) -> Digits16 {
-    let mut buf: Digits16 = [0, ..NDIGITS16];
+    let mut buf: Digits16 = unsafe {mem::uninitialized()};
     let (n, r) = div_rem(n, 100); buf[ 3] = TENS[r as uint]; buf[ 4] = ONES[r as uint];
     let (n, r) = div_rem(n, 100); buf[ 1] = TENS[r as uint]; buf[ 2] = ONES[r as uint];
     let r = n;                                               buf[ 0] = ONES[r as uint];
@@ -39,7 +39,7 @@ pub fn u16_to_digits(n: u16) -> Digits16 {
 }
 
 pub fn u8_to_digits(n: u8) -> Digits8 {
-    let mut buf: Digits8 = [0, ..NDIGITS8];
+    let mut buf: Digits8 = unsafe {mem::uninitialized()};
     let (n, r) = div_rem(n, 100); buf[ 1] = TENS[r as uint]; buf[ 2] = ONES[r as uint];
     let r = n;                                               buf[ 0] = ONES[r as uint];
     buf
