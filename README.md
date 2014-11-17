@@ -4,7 +4,7 @@ Experimental string-to-number and number-to-string conversion libraries and benc
 
 ## Notes
 
-Benchmarks are done with `cargo bench | tee /dev/stderr | ./mkbenchtab`.
+Benchmarks are done with `cargo bench strategy | tee /dev/stderr | ./mkbenchtab`.
 Take a grain of salt when interpreting the result.
 
 The benchmarks refer to the following machines at the author's disposal:

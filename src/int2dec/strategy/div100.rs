@@ -3,7 +3,7 @@ use std::num::div_rem;
 use int2dec::digits::{Digits64, Digits32, Digits16, Digits8};
 use int2dec::digits::{NDIGITS64, NDIGITS32, NDIGITS16, NDIGITS8};
 use int2dec::digits::{ONES, TENS};
-#[cfg(test)] use int2dec::test;
+#[cfg(test)] use int2dec::testing;
 
 pub fn u64_to_digits(n: u64) -> Digits64 {
     let mut buf: Digits64 = [0, ..NDIGITS64];
@@ -47,29 +47,29 @@ pub fn u8_to_digits(n: u8) -> Digits8 {
 
 #[cfg(test)] #[test]
 fn sanity_test() {
-    test::u64_sanity_test(u64_to_digits);
-    test::u32_sanity_test(u32_to_digits);
-    test::u16_sanity_test(u16_to_digits);
-    test::u8_sanity_test(u8_to_digits);
+    testing::u64_sanity_test(u64_to_digits);
+    testing::u32_sanity_test(u32_to_digits);
+    testing::u16_sanity_test(u16_to_digits);
+    testing::u8_sanity_test(u8_to_digits);
 }
 
 #[cfg(test)] #[bench]
-fn bench_u64(b: &mut test::Bencher) {
-    test::rotating_bench(u64_to_digits, b);
+fn bench_u64(b: &mut testing::Bencher) {
+    testing::rotating_bench(u64_to_digits, b);
 }
 
 #[cfg(test)] #[bench]
-fn bench_u32(b: &mut test::Bencher) {
-    test::rotating_bench(u32_to_digits, b);
+fn bench_u32(b: &mut testing::Bencher) {
+    testing::rotating_bench(u32_to_digits, b);
 }
 
 #[cfg(test)] #[bench]
-fn bench_u16(b: &mut test::Bencher) {
-    test::rotating_bench(u16_to_digits, b);
+fn bench_u16(b: &mut testing::Bencher) {
+    testing::rotating_bench(u16_to_digits, b);
 }
 
 #[cfg(test)] #[bench]
-fn bench_u8(b: &mut test::Bencher) {
-    test::rotating_bench(u8_to_digits, b);
+fn bench_u8(b: &mut testing::Bencher) {
+    testing::rotating_bench(u8_to_digits, b);
 }
 
