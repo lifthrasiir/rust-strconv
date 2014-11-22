@@ -1,4 +1,4 @@
-use std::num::div_rem;
+use num::div_rem;
 
 use int2dec::digits::{Digits64, Digits32};
 use int2dec::digits::{NDIGITS64, NDIGITS32};
