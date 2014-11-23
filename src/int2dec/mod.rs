@@ -12,7 +12,9 @@ mod digits;
 pub mod strategy {
     pub mod naive;
     pub mod div100;
+    pub mod div100_earlyexit;
     pub mod bcd;
+    pub mod bcd_earlyexit;
 }
 
 pub struct UintToDecFunc<I, T>(pub I, pub fn(I) -> T);
@@ -65,9 +67,9 @@ macro_rules! make_bench(
                 use std::io;
                 let mut n: $t = 1;
                 let mut buf = [0, ..4096];
-                let mut w = io::BufWriter::new(buf);
+                let mut w = io::BufWriter::new(&mut buf);
                 for _ in range(0, 64u) {
-                    let _ = write!(w, "{}", n);
+                    let _ = write!(&mut w, "{}", n);
                     n *= 3;
                 }
             });
@@ -79,9 +81,9 @@ macro_rules! make_bench(
                 use std::io;
                 let mut n: $t = 1;
                 let mut buf = [0, ..4096];
-                let mut w = io::BufWriter::new(buf);
+                let mut w = io::BufWriter::new(&mut buf);
                 for _ in range(0, 64u) {
-                    let _ = write!(w, "{}", UintToDec(n));
+                    let _ = write!(&mut w, "{}", UintToDec(n));
                     n *= 3;
                 }
             });

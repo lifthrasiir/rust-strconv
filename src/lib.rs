@@ -1,4 +1,4 @@
-#![feature(globs, macro_rules, slicing_syntax)]
+#![feature(globs, macro_rules, slicing_syntax, associated_types)]
 
 extern crate test;
 

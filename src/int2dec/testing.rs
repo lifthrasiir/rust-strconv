@@ -43,6 +43,14 @@ pub fn u8_sanity_test(f: |u8| -> Digits8) {
 #[inline(always)]
 pub fn rotating_bench<I: Int, T>(f: |I| -> T, b: &mut Bencher) {
     b.iter(|| {
+        // small integers (4, 5, 6, ..., 3424806)
+        let mut n = NumCast::from(4u).unwrap();
+        for _ in range(0, 64u) {
+            test::black_box(f(n));
+            n = n + (n >> 2);
+        }
+
+        // large integers
         let mut n = NumCast::from(1u).unwrap();
         for _ in range(0, 64u) {
             test::black_box(f(n));
