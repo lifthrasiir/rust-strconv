@@ -11,6 +11,7 @@ mod digits;
 
 pub mod strategy {
     pub mod naive;
+    pub mod naive_earlyexit;
     pub mod div100;
     pub mod div100_earlyexit;
     pub mod bcd;
