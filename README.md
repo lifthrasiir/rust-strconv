@@ -11,7 +11,8 @@ The benchmarks refer to the following machines at the author's disposal:
 
 * "Slow laptop": Intel Celeron 1037U, 4G RAM, x86\_64 GNU/Linux 3.13.0
 * "Fast server": AMD Phenom II X4 945, 20G RAM, x86\_64 GNU/Linux 3.0.0
-* "Moderate desktop": AMD Trinity A10 5800K, 8G RAM, Windows 7 (32-bit MinGW-w64)
+* "Moderate desktop (32-bit)": AMD Trinity A10 5800K, 8G RAM, Windows 7 (32-bit MinGW-w64)
+* "Moderate desktop (64-bit)": the same machine as above, but with 64-bit MinGW-w64
 
 ## `int2dec`
 
@@ -44,7 +45,7 @@ Strategy | `u8` | `u16` | `u32` | `u64`
 `div100` | **652 (1)** | **1028 (3)** | 1944 (5) | 4694 (15)
 `div100_earlyexit` | 740 (27) | 1375 (9) | **1846 (8)** | 6684 (22)
 
-Results from the moderate desktop:
+Results from the moderate desktop, 32-bit:
 
 Strategy | `u8` | `u16` | `u32` | `u64`
 ---------|------|-------|-------|------
@@ -54,4 +55,15 @@ Strategy | `u8` | `u16` | `u32` | `u64`
 `bcd_earlyexit` | N/A | N/A | 1967 (136) | **3571 (113)**
 `div100` | 849 (67) | **727 (28)** | **1588 (111)** | 23151 (537)
 `div100_earlyexit` | **543 (40)** | 901 (32) | 1785 (120) | 14204 (1450)
+
+Results from the moderate desktop, 64-bit:
+
+Strategy | `u8` | `u16` | `u32` | `u64`
+---------|------|-------|-------|------
+`naive` | 1040 (61) | 1280 (71) | 3166 (270) | 7421 (269)
+`naive_earlyexit` | 1655 (66) | 2011 (202) | 2578 (63) | 3989 (387)
+`bcd` | N/A | N/A | 1879 (177) | 4321 (277)
+`bcd_earlyexit` | N/A | N/A | 1790 (79) | **2968 (238)**
+`div100` | **570 (23)** | **954 (59)** | 1807 (118) | 4851 (378)
+`div100_earlyexit` | 675 (53) | 1060 (57) | **1546 (237)** | 3501 (245)
 

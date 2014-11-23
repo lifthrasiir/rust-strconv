@@ -18,11 +18,23 @@ pub mod strategy {
     pub mod bcd_earlyexit;
 }
 
+pub mod best {
+    pub use super::strategy::bcd_earlyexit::u64_to_digits;
+
+    #[cfg(target_arch = "i686")] pub use super::strategy::div100::u32_to_digits;
+    #[cfg(not(target_arch = "i686"))] pub use super::strategy::div100_earlyexit::u32_to_digits;
+
+    pub use super::strategy::div100::u16_to_digits;
+
+    #[cfg(target_arch = "i686")] pub use super::strategy::div100_earlyexit::u8_to_digits;
+    #[cfg(not(target_arch = "i686"))] pub use super::strategy::div100::u8_to_digits;
+}
+
 pub struct UintToDecFunc<I, T>(pub I, pub fn(I) -> T);
 pub struct UintToDec<I>(pub I);
 
 macro_rules! impl_uint_to_dec(
-    ($t:ty, $Digits:ty, $default_conv:expr) => (
+    ($t:ty, $Digits:ty, $default_conv:ident) => (
         impl<I: Int> fmt::Show for UintToDecFunc<I, $Digits> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 let UintToDecFunc(num, conv) = *self;
@@ -37,16 +49,16 @@ macro_rules! impl_uint_to_dec(
             #[inline]
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 let UintToDec(num) = *self;
-                UintToDecFunc(num, $default_conv).fmt(f)
+                UintToDecFunc(num, best::$default_conv).fmt(f)
             }
         }
     )
 )
 
-impl_uint_to_dec!(u64, Digits64, strategy::bcd::u64_to_digits)
-impl_uint_to_dec!(u32, Digits32, strategy::div100::u32_to_digits)
-impl_uint_to_dec!(u16, Digits16, strategy::div100::u16_to_digits)
-impl_uint_to_dec!(u8, Digits8, strategy::div100::u8_to_digits)
+impl_uint_to_dec!(u64, Digits64, u64_to_digits)
+impl_uint_to_dec!(u32, Digits32, u32_to_digits)
+impl_uint_to_dec!(u16, Digits16, u16_to_digits)
+impl_uint_to_dec!(u8, Digits8, u8_to_digits)
 
 #[cfg(test)] #[test]
 fn sanity_test() {
