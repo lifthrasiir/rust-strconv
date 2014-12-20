@@ -17,6 +17,6 @@ pub static TENS: &'static [u8] = b"000000000011111111112222222222333333333344444
 pub static ONES: &'static [u8] = b"01234567890123456789012345678901234567890123456789\
                                    01234567890123456789012345678901234567890123456789";
 
-macro_rules! tens(($i:expr) => (TENS[$i as uint]))
-macro_rules! ones(($i:expr) => (ONES[$i as uint]))
+macro_rules! tens { ($i:expr) => (TENS[$i as uint]) }
+macro_rules! ones { ($i:expr) => (ONES[$i as uint]) }
 

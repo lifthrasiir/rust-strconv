@@ -14,24 +14,24 @@ pub fn u64_to_digits(n: u64) -> Digits64 {
     let n2 = ((n >> 32) & 0xffff) as u32;
     let n3 = ((n >> 48) & 0xffff) as u32;
 
-    macro_rules! quad(
+    macro_rules! quad {
         ($d:expr, $i:expr) => ({
             let (qq, rr) = div_rem($d, 100);
             buf[$i  ] = tens!(qq); buf[$i+1] = ones!(qq);
             buf[$i+2] = tens!(rr); buf[$i+3] = ones!(rr);
         })
-    )
+    }
 
     if n <= 0 { return buf; }
-    let (c0, d0) = div_rem(      656 * n3 + 7296 * n2 + 5536 * n1 + n0, 10000); quad!(d0, 16)
+    let (c0, d0) = div_rem(      656 * n3 + 7296 * n2 + 5536 * n1 + n0, 10000); quad!(d0, 16);
     if n <= 9999 { return buf; }
-    let (c1, d1) = div_rem(c0 + 7671 * n3 + 9496 * n2 +    6 * n1,      10000); quad!(d1, 12)
+    let (c1, d1) = div_rem(c0 + 7671 * n3 + 9496 * n2 +    6 * n1,      10000); quad!(d1, 12);
     if n <= 9999_9999 { return buf; }
-    let (c2, d2) = div_rem(c1 + 4749 * n3 +   42 * n2,                  10000); quad!(d2, 8)
+    let (c2, d2) = div_rem(c1 + 4749 * n3 +   42 * n2,                  10000); quad!(d2, 8);
     if n <= 9999_9999_9999 { return buf; }
-    let (d4, d3) = div_rem(c2 +  281 * n3,                              10000); quad!(d3, 4)
+    let (d4, d3) = div_rem(c2 +  281 * n3,                              10000); quad!(d3, 4);
     if n <= 9999_9999_9999_9999 { return buf; }
-    quad!(d4, 0)
+    quad!(d4, 0);
 
     buf
 }
@@ -42,18 +42,18 @@ pub fn u32_to_digits(n: u32) -> Digits32 {
     let n0 = (n & 0xffff) as u32;
     let n1 = ((n >> 16) & 0xffff) as u32;
 
-    macro_rules! quad(
+    macro_rules! quad {
         ($d:expr, $i:expr) => ({
             let (qq, rr) = div_rem($d, 100);
             buf[$i  ] = tens!(qq); buf[$i+1] = ones!(qq);
             buf[$i+2] = tens!(rr); buf[$i+3] = ones!(rr);
         })
-    )
+    }
 
     if n <= 0 { return buf; }
-    let (c0, d0) = div_rem(     5536 * n1 + n0, 10000); quad!(d0, 6)
-    if n <= 9999 { return buf; }
-    let (d2, d1) = div_rem(c0 +    6 * n1,      10000); quad!(d1, 2)
+    let (c0, d0) = div_rem(     5536 * n1 + n0, 10000); quad!(d0, 6);
+    if n <= 9999 { return buf; };
+    let (d2, d1) = div_rem(c0 +    6 * n1,      10000); quad!(d1, 2);
     if n <= 9999_9999 { return buf; }
     buf[0] = tens!(d2); buf[1] = ones!(d2);
 

@@ -19,19 +19,19 @@ pub fn u64_to_digits(n: u64) -> Digits64 {
     let (c2, d2) = div_rem(c1 + 4749 * n3 +   42 * n2,                  10000);
     let (d4, d3) = div_rem(c2 +  281 * n3,                              10000);
 
-    macro_rules! quad(
+    macro_rules! quad {
         ($d:expr, $i:expr) => ({
             let (qq, rr) = div_rem($d, 100);
             buf[$i  ] = tens!(qq); buf[$i+1] = ones!(qq);
             buf[$i+2] = tens!(rr); buf[$i+3] = ones!(rr);
         })
-    )
+    }
 
-    quad!(d4, 0)
-    quad!(d3, 4)
-    quad!(d2, 8)
-    quad!(d1, 12)
-    quad!(d0, 16)
+    quad!(d4, 0);
+    quad!(d3, 4);
+    quad!(d2, 8);
+    quad!(d1, 12);
+    quad!(d0, 16);
 
     buf
 }
@@ -45,18 +45,18 @@ pub fn u32_to_digits(n: u32) -> Digits32 {
     let (c0, d0) = div_rem(     5536 * n1 + n0, 10000);
     let (d2, d1) = div_rem(c0 +    6 * n1,      10000);
 
-    macro_rules! quad(
+    macro_rules! quad {
         ($d:expr, $i:expr) => ({
             let (qq, rr) = div_rem($d, 100);
             buf[$i  ] = tens!(qq); buf[$i+1] = ones!(qq);
             buf[$i+2] = tens!(rr); buf[$i+3] = ones!(rr);
         })
-    )
+    }
 
     buf[0] = tens!(d2);
     buf[1] = ones!(d2);
-    quad!(d1, 2)
-    quad!(d0, 6)
+    quad!(d1, 2);
+    quad!(d0, 6);
 
     buf
 }

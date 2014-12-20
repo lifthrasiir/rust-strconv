@@ -33,7 +33,7 @@ pub mod best {
 pub struct UintToDecFunc<I, T>(pub I, pub fn(I) -> T);
 pub struct UintToDec<I>(pub I);
 
-macro_rules! impl_uint_to_dec(
+macro_rules! impl_uint_to_dec {
     ($t:ty, $Digits:ty, $default_conv:ident) => (
         impl<I: Int> fmt::Show for UintToDecFunc<I, $Digits> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -53,12 +53,12 @@ macro_rules! impl_uint_to_dec(
             }
         }
     )
-)
+}
 
-impl_uint_to_dec!(u64, Digits64, u64_to_digits)
-impl_uint_to_dec!(u32, Digits32, u32_to_digits)
-impl_uint_to_dec!(u16, Digits16, u16_to_digits)
-impl_uint_to_dec!(u8, Digits8, u8_to_digits)
+impl_uint_to_dec!(u64, Digits64, u64_to_digits);
+impl_uint_to_dec!(u32, Digits32, u32_to_digits);
+impl_uint_to_dec!(u16, Digits16, u16_to_digits);
+impl_uint_to_dec!(u8, Digits8, u8_to_digits);
 
 #[cfg(test)] #[test]
 fn sanity_test() {
@@ -72,7 +72,7 @@ fn sanity_test() {
     }
 }
 
-macro_rules! make_bench(
+macro_rules! make_bench {
     ($t:ty: $system:ident vs $best:ident) => (
         #[cfg(test)] #[bench]
         fn $system(b: &mut test::Bencher) {
@@ -102,10 +102,10 @@ macro_rules! make_bench(
             });
         }
     )
-)
+}
 
-make_bench!(u64: bench_u64_system vs bench_u64_best)
-make_bench!(u32: bench_u32_system vs bench_u32_best)
-make_bench!(u16: bench_u16_system vs bench_u16_best)
-make_bench!(u8: bench_u8_system vs bench_u8_best)
+make_bench!(u64: bench_u64_system vs bench_u64_best);
+make_bench!(u32: bench_u32_system vs bench_u32_best);
+make_bench!(u16: bench_u16_system vs bench_u16_best);
+make_bench!(u8: bench_u8_system vs bench_u8_best);
 
