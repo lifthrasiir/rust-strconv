@@ -67,3 +67,19 @@ Strategy | `u8` | `u16` | `u32` | `u64`
 `div100` | **570 (23)** | **954 (59)** | 1807 (118) | 4851 (378)
 `div100_earlyexit` | 675 (53) | 1060 (57) | **1546 (237)** | 3501 (245)
 
+## `flt2dec`
+
+Floating point number to decimal string for the shortest representation. In progress.
+
+* `dragon` implements a variant of the Dragon algorithm originally described by Steele and White
+  and re-refined by Burger and Dybvig (the refinement itself was known but only described later).
+  Requires a quite bit of stack (max 2KB), and may pose a problem with constrained environments.
+  (Status: Implemented and roughly tested, should convert to the common interface)
+* `grisu_inexact` implements the Grisu2 algorithm described by Florian Loitsch.
+  This *is* inexact, but is very fast and can be used as a replacement to `dragon`.
+  (Status: I have a code but yet to integrate to strconv.)
+* `grisu` implements the Grisu3 algorithm, which is a conditional algorithm similar to Grisu2.
+  This returns either a formatted number or an error, in which case the caller should fall back.
+  Both case is very fast so it is best to use with `dragon`.
+  (Status: Not yet implemented.)
+
