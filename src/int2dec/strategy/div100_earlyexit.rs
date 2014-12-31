@@ -6,7 +6,7 @@ use int2dec::digits::{ONES, TENS};
 #[cfg(test)] use int2dec::testing;
 
 pub fn u64_to_digits(n: u64) -> Digits64 {
-    let mut buf: Digits64 = [b'0', ..NDIGITS64];
+    let mut buf: Digits64 = [b'0'; NDIGITS64];
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[18] = tens!(r); buf[19] = ones!(r);
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[16] = tens!(r); buf[17] = ones!(r);
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[14] = tens!(r); buf[15] = ones!(r);
@@ -21,7 +21,7 @@ pub fn u64_to_digits(n: u64) -> Digits64 {
 }
 
 pub fn u32_to_digits(n: u32) -> Digits32 {
-    let mut buf: Digits32 = [b'0', ..NDIGITS32];
+    let mut buf: Digits32 = [b'0'; NDIGITS32];
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 8] = tens!(r); buf[ 9] = ones!(r);
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 6] = tens!(r); buf[ 7] = ones!(r);
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 4] = tens!(r); buf[ 5] = ones!(r);
@@ -31,7 +31,7 @@ pub fn u32_to_digits(n: u32) -> Digits32 {
 }
 
 pub fn u16_to_digits(n: u16) -> Digits16 {
-    let mut buf: Digits16 = [b'0', ..NDIGITS16];
+    let mut buf: Digits16 = [b'0'; NDIGITS16];
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 3] = tens!(r); buf[ 4] = ones!(r);
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 1] = tens!(r); buf[ 2] = ones!(r);
     if n == 0 { return buf; } let r = n;                    buf[ 0] = r as u8 + b'0';
@@ -39,7 +39,7 @@ pub fn u16_to_digits(n: u16) -> Digits16 {
 }
 
 pub fn u8_to_digits(n: u8) -> Digits8 {
-    let mut buf: Digits8 = [b'0', ..NDIGITS8];
+    let mut buf: Digits8 = [b'0'; NDIGITS8];
     if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 1] = tens!(r); buf[ 2] = ones!(r);
     if n == 0 { return buf; } let r = n;                    buf[ 0] = r as u8 + b'0';
     buf

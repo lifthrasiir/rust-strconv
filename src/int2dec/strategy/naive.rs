@@ -5,7 +5,7 @@ use int2dec::digits::{NDIGITS64, NDIGITS32, NDIGITS16, NDIGITS8};
 #[cfg(test)] use int2dec::testing;
 
 pub fn u64_to_digits(mut n: u64) -> Digits64 {
-    let mut buf: Digits64 = [0, ..NDIGITS64];
+    let mut buf: Digits64 = [0; NDIGITS64];
     for i in range(0, NDIGITS64).rev() {
         let (q, r) = div_rem(n, 10);
         buf[i] = r as u8 + b'0';
@@ -15,7 +15,7 @@ pub fn u64_to_digits(mut n: u64) -> Digits64 {
 }
 
 pub fn u32_to_digits(mut n: u32) -> Digits32 {
-    let mut buf: Digits32 = [0, ..NDIGITS32];
+    let mut buf: Digits32 = [0; NDIGITS32];
     for i in range(0, NDIGITS32).rev() {
         let (q, r) = div_rem(n, 10);
         buf[i] = r as u8 + b'0';
@@ -25,7 +25,7 @@ pub fn u32_to_digits(mut n: u32) -> Digits32 {
 }
 
 pub fn u16_to_digits(mut n: u16) -> Digits16 {
-    let mut buf: Digits16 = [0, ..NDIGITS16];
+    let mut buf: Digits16 = [0; NDIGITS16];
     for i in range(0, NDIGITS16).rev() {
         let (q, r) = div_rem(n, 10);
         buf[i] = r as u8 + b'0';
@@ -35,7 +35,7 @@ pub fn u16_to_digits(mut n: u16) -> Digits16 {
 }
 
 pub fn u8_to_digits(mut n: u8) -> Digits8 {
-    let mut buf: Digits8 = [0, ..NDIGITS8];
+    let mut buf: Digits8 = [0; NDIGITS8];
     for i in range(0, NDIGITS8).rev() {
         let (q, r) = div_rem(n, 10);
         buf[i] = r as u8 + b'0';

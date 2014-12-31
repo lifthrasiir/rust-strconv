@@ -49,16 +49,16 @@ impl_full_ops! {
 }
 
 macro_rules! define_bignum {
-    ($name:ident: [$ty:ty, ..$n:expr]) => (
+    ($name:ident: [$ty:ty; $n:expr]) => (
         #[deriving(Copy)]
         pub struct $name {
             size: uint, // base[size..] is known to be zero
-            base: [$ty, ..$n] // [a, b, c, ...] represents a + b*n + c*n^2 + ...
+            base: [$ty; $n] // [a, b, c, ...] represents a + b*n + c*n^2 + ...
         }
 
         impl $name {
             pub fn from_small(v: $ty) -> $name {
-                let mut base = [0, ..$n];
+                let mut base = [0; $n];
                 base[0] = v;
                 $name { size: 1, base: base }
             }
@@ -66,7 +66,7 @@ macro_rules! define_bignum {
             pub fn from_u64(mut v: u64) -> $name {
                 use std::mem;
 
-                let mut base = [0, ..$n];
+                let mut base = [0; $n];
                 let mut sz = 0;
                 while v > 0 {
                     base[sz] = v as $ty;
@@ -232,11 +232,11 @@ macro_rules! define_bignum {
 }
 
 pub type Digit32 = u32;
-define_bignum!(Big32x36: [Digit32, ..36]);
+define_bignum!(Big32x36: [Digit32; 36]);
 
 #[cfg(test)]
 mod tests {
-    define_bignum!(Big: [u8, ..3]);
+    define_bignum!(Big: [u8; 3]);
 
     #[test]
     #[should_fail]

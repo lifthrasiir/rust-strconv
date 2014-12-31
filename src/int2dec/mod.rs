@@ -79,7 +79,7 @@ macro_rules! make_bench {
             b.iter(|| {
                 use std::io;
                 let mut n: $t = 1;
-                let mut buf = [0, ..4096];
+                let mut buf = [0; 4096];
                 let mut w = io::BufWriter::new(&mut buf);
                 for _ in range(0, 64u) {
                     let _ = write!(&mut w, "{}", n);
@@ -93,7 +93,7 @@ macro_rules! make_bench {
             b.iter(|| {
                 use std::io;
                 let mut n: $t = 1;
-                let mut buf = [0, ..4096];
+                let mut buf = [0; 4096];
                 let mut w = io::BufWriter::new(&mut buf);
                 for _ in range(0, 64u) {
                     let _ = write!(&mut w, "{}", UintToDec(n));

@@ -7,10 +7,10 @@ pub const NDIGITS8: uint = 3; // 255
 
 pub type Digit = u8;
 
-pub type Digits64 = [Digit, ..NDIGITS64];
-pub type Digits32 = [Digit, ..NDIGITS32];
-pub type Digits16 = [Digit, ..NDIGITS16];
-pub type Digits8 = [Digit, ..NDIGITS8];
+pub type Digits64 = [Digit; NDIGITS64];
+pub type Digits32 = [Digit; NDIGITS32];
+pub type Digits16 = [Digit; NDIGITS16];
+pub type Digits8 = [Digit; NDIGITS8];
 
 pub static TENS: &'static [u8] = b"00000000001111111111222222222233333333334444444444\
                                    55555555556666666666777777777788888888889999999999";
