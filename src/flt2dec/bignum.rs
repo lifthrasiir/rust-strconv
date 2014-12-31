@@ -57,10 +57,6 @@ macro_rules! define_bignum {
         }
 
         impl $name {
-            pub fn zero() -> $name {
-                $name { size: 0, base: [0, ..$n] }
-            }
-
             pub fn from_small(v: $ty) -> $name {
                 let mut base = [0, ..$n];
                 base[0] = v;
@@ -86,7 +82,7 @@ macro_rules! define_bignum {
 
                 let mut sz = cmp::max(self.size, other.size);
                 let mut carry = false;
-                for (a, b) in self.base[mut ..sz].iter_mut().zip(other.base[..sz].iter()) {
+                for (a, b) in self.base.slice_to_mut(sz).iter_mut().zip(other.base[..sz].iter()) {
                     let (c, v) = (*a).full_add(*b, carry);
                     *a = v;
                     carry = c;
@@ -105,7 +101,7 @@ macro_rules! define_bignum {
 
                 let sz = cmp::max(self.size, other.size);
                 let mut noborrow = true;
-                for (a, b) in self.base[mut ..sz].iter_mut().zip(other.base[..sz].iter()) {
+                for (a, b) in self.base.slice_to_mut(sz).iter_mut().zip(other.base[..sz].iter()) {
                     let (c, v) = (*a).full_add(!*b, noborrow);
                     *a = v;
                     noborrow = c;
@@ -120,7 +116,7 @@ macro_rules! define_bignum {
 
                 let mut sz = self.size;
                 let mut carry = 0;
-                for a in self.base[mut ..sz].iter_mut() {
+                for a in self.base.slice_to_mut(sz).iter_mut() {
                     let (c, v) = (*a).full_mul(other, carry);
                     *a = v;
                     carry = c;
@@ -180,7 +176,7 @@ macro_rules! define_bignum {
 
                 let sz = self.size;
                 let mut borrow = 0;
-                for a in self.base[mut ..sz].iter_mut().rev() {
+                for a in self.base.slice_to_mut(sz).iter_mut().rev() {
                     let (q, r) = (*a).full_div_rem(other, borrow);
                     *a = q;
                     borrow = r;
@@ -235,6 +231,9 @@ macro_rules! define_bignum {
     )
 }
 
+pub type Digit32 = u32;
+define_bignum!(Big32x36: [Digit32, ..36]);
+
 #[cfg(test)]
 mod tests {
     define_bignum!(Big: [u8, ..3]);
@@ -248,8 +247,8 @@ mod tests {
     #[test]
     fn test_add() {
         assert_eq!(Big::from_small(3).add(&Big::from_small(4)), Big::from_small(7));
-        assert_eq!(Big::from_small(3).add(&Big::zero()), Big::from_small(3));
-        assert_eq!(Big::zero().add(&Big::from_small(3)), Big::from_small(3));
+        assert_eq!(Big::from_small(3).add(&Big::from_small(0)), Big::from_small(3));
+        assert_eq!(Big::from_small(0).add(&Big::from_small(3)), Big::from_small(3));
         assert_eq!(Big::from_small(3).add(&Big::from_u64(0xfffe)), Big::from_u64(0x10001)); 
         assert_eq!(Big::from_u64(0xfedc).add(&Big::from_u64(0x789)), Big::from_u64(0x10665)); 
         assert_eq!(Big::from_u64(0x789).add(&Big::from_u64(0xfedc)), Big::from_u64(0x10665)); 
@@ -273,7 +272,7 @@ mod tests {
         assert_eq!(Big::from_u64(0x10665).sub(&Big::from_u64(0x789)), Big::from_u64(0xfedc)); 
         assert_eq!(Big::from_u64(0x10665).sub(&Big::from_u64(0xfedc)), Big::from_u64(0x789)); 
         assert_eq!(Big::from_u64(0x10665).sub(&Big::from_u64(0x10664)), Big::from_small(1)); 
-        assert_eq!(Big::from_u64(0x10665).sub(&Big::from_u64(0x10665)), Big::zero()); 
+        assert_eq!(Big::from_u64(0x10665).sub(&Big::from_u64(0x10665)), Big::from_small(0)); 
     }
 
     #[test]
@@ -285,7 +284,7 @@ mod tests {
     #[test]
     #[should_fail]
     fn test_sub_underflow_2() {
-        Big::zero().sub(&Big::from_u64(0x123456));
+        Big::from_small(0).sub(&Big::from_u64(0x123456));
     }
 
     #[test]
@@ -310,7 +309,7 @@ mod tests {
         assert_eq!(Big::from_u64(0x123).mul_pow2(0), Big::from_u64(0x123));
         assert_eq!(Big::from_u64(0x123).mul_pow2(7), Big::from_u64(0x9180));
         assert_eq!(Big::from_u64(0x123).mul_pow2(15), Big::from_u64(0x918000));
-        assert_eq!(Big::zero().mul_pow2(23), Big::zero());
+        assert_eq!(Big::from_small(0).mul_pow2(23), Big::from_small(0));
     }
 
     #[test]
@@ -329,7 +328,7 @@ mod tests {
     fn test_div_rem_small() {
         assert_eq!(Big::from_small(0xff).div_rem_small(15), (Big::from_small(17), 0));
         assert_eq!(Big::from_small(0xff).div_rem_small(16), (Big::from_small(15), 15));
-        assert_eq!(Big::from_small(3).div_rem_small(40), (Big::zero(), 3));
+        assert_eq!(Big::from_small(3).div_rem_small(40), (Big::from_small(0), 3));
         assert_eq!(Big::from_u64(0xffffff).div_rem_small(123),
                    (Big::from_u64(0xffffff / 123), (0xffffffu64 % 123) as u8));
         assert_eq!(Big::from_u64(0x10000).div_rem_small(123),
