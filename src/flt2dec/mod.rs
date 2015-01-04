@@ -6,7 +6,9 @@ mod decoder;
 
 #[cfg(test)] mod testing;
 pub mod strategy {
+    pub mod system;
     pub mod dragon;
+    pub mod grisu;
 }
 
 // it is a bit non-trivial to derive, but this is one plus the maximal number of

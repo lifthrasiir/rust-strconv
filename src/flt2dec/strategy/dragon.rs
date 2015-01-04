@@ -344,21 +344,10 @@ fn bench_small_shortest(b: &mut test::Bencher) {
 }
 
 #[cfg(test)] #[bench]
-fn bench_small_system(b: &mut test::Bencher) {
-    b.iter(|| 3.141592f64.to_string());
-}
-
-#[cfg(test)] #[bench]
 fn bench_big_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_system(b: &mut test::Bencher) {
-    let v: f64 = Float::max_value();
-    b.iter(|| v.to_string());
 }
 

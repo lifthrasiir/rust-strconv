@@ -24,7 +24,7 @@ macro_rules! impl_full_ops {
                 fn full_mul(self, other: $ty, carry: $ty) -> ($ty, $ty) {
                     // this cannot overflow, the output is between 0 and 2^nbits * (2^nbits - 1)
                     let nbits = mem::size_of::<$ty>() * 8;
-                    let v = self as $bigty * other as $bigty + carry as $bigty;
+                    let v = (self as $bigty) * (other as $bigty) + (carry as $bigty);
                     ((v >> nbits) as $ty, v as $ty)
                 }
 
@@ -32,7 +32,7 @@ macro_rules! impl_full_ops {
                     debug_assert!(borrow < other);
                     // this cannot overflow, the dividend is between 0 and other * 2^nbits - 1
                     let nbits = mem::size_of::<$ty>() * 8;
-                    let lhs = (borrow as $bigty << nbits) | self as $bigty;
+                    let lhs = ((borrow as $bigty) << nbits) | (self as $bigty);
                     let rhs = other as $bigty;
                     ((lhs / rhs) as $ty, (lhs % rhs) as $ty)
                 }
