@@ -50,7 +50,7 @@ impl_full_ops! {
 
 macro_rules! define_bignum {
     ($name:ident: [$ty:ty; $n:expr]) => (
-        #[deriving(Copy)]
+        #[derive(Copy)]
         pub struct $name {
             size: uint, // base[size..] is known to be zero
             base: [$ty; $n] // [a, b, c, ...] represents a + b*n + c*n^2 + ...
@@ -193,11 +193,13 @@ macro_rules! define_bignum {
         }
 
         impl PartialOrd for $name {
-            fn partial_cmp(&self, other: &$name) -> Option<Ordering> { Some(self.cmp(other)) }
+            fn partial_cmp(&self, other: &$name) -> Option<::std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
         }
 
         impl Ord for $name {
-            fn cmp(&self, other: &$name) -> Ordering {
+            fn cmp(&self, other: &$name) -> ::std::cmp::Ordering {
                 use std::cmp::max;
                 use std::iter::order;
 

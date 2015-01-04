@@ -1,4 +1,5 @@
 use std::num::{Int, Float};
+use std::cmp::Ordering::{Greater, Equal};
 #[cfg(test)] use test;
 
 use flt2dec::intrin;
@@ -339,7 +340,7 @@ fn exact_sanity_test() {
 fn bench_small_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
-    b.iter(|| { let mut buf = [0, ..MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
+    b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
 }
 
 #[cfg(test)] #[bench]
@@ -352,7 +353,7 @@ fn bench_big_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
     let v: f64 = Float::max_value();
     let decoded = decode(v);
-    b.iter(|| { let mut buf = [0, ..MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
+    b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
 }
 
 #[cfg(test)] #[bench]

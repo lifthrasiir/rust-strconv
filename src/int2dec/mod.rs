@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{str, fmt};
 use std::num::Int;
 #[cfg(test)] use test;
 
@@ -41,7 +41,7 @@ macro_rules! impl_uint_to_dec {
                 let buf = conv(num);
                 let last = buf.len() - 1;
                 let start = buf[..last].iter().position(|&c| c != b'0').unwrap_or(last);
-                f.pad_integral(true, "", buf[start..])
+                f.pad_integral(true, "", unsafe {str::from_utf8_unchecked(buf[start..])})
             }
         }
 

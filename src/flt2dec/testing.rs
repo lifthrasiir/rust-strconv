@@ -10,7 +10,7 @@ macro_rules! check_shortest {
     ($fmt:ident($v:expr) => $buf:expr, $exp:expr) => ({
         use flt2dec::decode;
 
-        let mut buf = [0, ..MAX_SIG_DIGITS];
+        let mut buf = [0; MAX_SIG_DIGITS];
         let (len, k) = $fmt(&decode($v), &mut buf);
         assert_eq!((str::from_utf8(buf[..len]).unwrap(), k),
                    (str::from_utf8($buf).unwrap(), $exp));
@@ -26,8 +26,8 @@ macro_rules! check_exact {
         let expectedk = $exp;
 
         // use a large enough buffer
-        let mut buf = [0, ..128];
-        let mut expected_ = [0, ..128];
+        let mut buf = [0; 128];
+        let mut expected_ = [0; 128];
 
         let decoded = decode($v);
         for i in range(1, expected.len() - 1) {
