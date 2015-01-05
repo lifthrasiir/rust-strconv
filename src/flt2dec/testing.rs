@@ -1,6 +1,7 @@
+use std::{str, mem};
 use std::num::Float;
-use std::str;
-use flt2dec::{Decoded, MAX_SIG_DIGITS};
+use std::slice::bytes;
+use flt2dec::{decode, Decoded, MAX_SIG_DIGITS, round_up};
 
 //use test;
 
@@ -8,8 +9,6 @@ pub use test::Bencher;
 
 macro_rules! check_shortest {
     ($fmt:ident($v:expr) => $buf:expr, $exp:expr) => ({
-        use flt2dec::decode;
-
         let mut buf = [0; MAX_SIG_DIGITS];
         let (len, k) = $fmt(&decode($v), &mut buf);
         assert_eq!((str::from_utf8(buf[..len]).unwrap(), k),
@@ -19,9 +18,6 @@ macro_rules! check_shortest {
 
 macro_rules! check_exact {
     ($fmt:ident($v:expr) => $buf:expr, $exp:expr) => ({
-        use flt2dec::{decode, round_up};
-        use std::slice::bytes;
-
         let expected = $buf;
         let expectedk = $exp;
 
@@ -180,5 +176,48 @@ pub fn f64_exact_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
     check_exact!(f(maxf64)         => b"1797693134862315708145274237317043567980", 309);
     check_exact!(f(minnormf64)     => b"2225073858507201383090232717332404064219", -307);
     check_exact!(f(minf64)         => b"4940656458412465441765687928682213723650", -323);
+}
+
+pub fn f32_equivalence_test(f: |&Decoded, &mut [u8]| -> Option<(uint, i16)>,
+                            g: |&Decoded, &mut [u8]| -> (uint, i16)) {
+    // we have only 2^23 * (2^8 - 1) - 1 = 2,139,095,039 positive finite f32 values,
+    // so why not simply testing all of them?
+    //
+    // this is of course very stressful (and thus should be behind an `#[ignore]` attribute),
+    // but with `-O3 -C lto` this only takes about two hours or so.
+
+    let mut ntested = 0;
+    let mut npassed = 0; // f(x) = Some(g(x))
+    let mut nignored = 0; // f(x) = None
+
+    for i in 0x00000001..0x7f800000 {
+        if (i & 0xfffff) == 0 {
+            println!("in progress, {:x}/{:x} (ignored={} passed={} failed={})",
+                     i, 0x7f800000u32, nignored, npassed, ntested - nignored - npassed);
+        }
+
+        let x: f32 = unsafe {mem::transmute(i)};
+        let decoded = decode(x);
+        let mut buf1 = [0; MAX_SIG_DIGITS];
+        if let Some((len1, e1)) = f(&decoded, &mut buf1) {
+            let mut buf2 = [0; MAX_SIG_DIGITS];
+            let (len2, e2) = g(&decoded, &mut buf2);
+            if e1 == e2 && buf1[..len1] == buf2[..len2] {
+                npassed += 1;
+            } else {
+                println!("equivalent test failed, i={:x} f(i)={}e{} g(i)={}e{}",
+                         i, str::from_utf8(buf1[..len1]).unwrap(), e1,
+                            str::from_utf8(buf2[..len2]).unwrap(), e2);
+            }
+        } else {
+            nignored += 1;
+        }
+        ntested += 1;
+    }
+    println!("done, ignored={} passed={} failed={}",
+             nignored, npassed, ntested - nignored - npassed);
+    assert!(nignored + npassed < ntested,
+            "{} out of {} f32 values returns an incorrect value!",
+            ntested - nignored - npassed, 0x7f7fffffu32);
 }
 

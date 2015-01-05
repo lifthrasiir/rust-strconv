@@ -69,17 +69,27 @@ Strategy | `u8` | `u16` | `u32` | `u64`
 
 ## `flt2dec`
 
-Floating point number to decimal string for the shortest representation. In progress.
+Floating point number to decimal string for the valid representation (i.e. rounds to
+the original value when converted back). In progress.
+
+There are three possible modes of string conversion:
+
+* **Shortest**: Produces the shortest representation among all numbers that round to given value.
+  If there are multiple shortest representations, the closest one should be used.
+* **Exact**: Given the number of digits, produces the exactly rounded representation of given value.
+* **Longest**: Produces the exact representation of given value, with an unbounded number of digits.
+
+There are several algorithms available:
 
 * `dragon` implements a variant of the Dragon algorithm originally described by Steele and White
   and re-refined by Burger and Dybvig (the refinement itself was known but only described later).
   Requires a quite bit of stack (max 2KB), and may pose a problem with constrained environments.
-  (Status: Implemented and roughly tested, should convert to the common interface)
+  (Status: Implemented, longest pending. Roughly tested.)
 * `grisu_inexact` implements the Grisu2 algorithm described by Florian Loitsch.
   This *is* inexact, but is very fast and can be used as a replacement to `dragon`.
   (Status: I have a code but yet to integrate to strconv.)
 * `grisu` implements the Grisu3 algorithm, which is a conditional algorithm similar to Grisu2.
   This returns either a formatted number or an error, in which case the caller should fall back.
   Both case is very fast so it is best to use with `dragon`.
-  (Status: Not yet implemented.)
+  (Status: Implemented, exact and longest pending. Tested exhaustively for f32, roughly for f64.)
 

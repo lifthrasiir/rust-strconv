@@ -490,6 +490,19 @@ fn shortest_sanity_test() {
     testing::f32_shortest_sanity_test(format_shortest);
 }
 
+#[cfg(test)] #[test] #[ignore] // it is too expensive
+fn shortest_f32_equivalence_test() {
+    // it is hard to directly test the optimality of the output, but we can at least test if
+    // two different algorithms agree to each other.
+    //
+    // this reports the progress and the number of f32 values returned `None`.
+    // with `--nocapture` (and plenty of time and appropriate rustc flags), this should print:
+    // `done, ignored=17643160 passed=2121451879 failed=0`.
+
+    use flt2dec::strategy::dragon::format_shortest as fallback;
+    testing::f32_equivalence_test(format_shortest_opt, fallback);
+}
+
 #[cfg(test)] #[bench]
 fn bench_small_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
