@@ -210,7 +210,7 @@ fn test_max_pow10_less_than() {
     }
 }
 
-pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint, /*exp*/ i16)> {
+pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint, /*exp*/ i16)> {
     assert!(d.mant > 0);
     assert!(d.minus > 0);
     assert!(d.plus > 0);
@@ -228,7 +228,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint,
     // since `plus` is normalized, this means `2^(62 + alpha) <= plus * cached < 2^(64 + gamma)`;
     // given our choices of `alpha` and `gamma`, this puts `plus * cached` into `[4, 2^32)`.
     //
-    // it is obviously desirable to maximiate `gamma - alpha`,
+    // it is obviously desirable to maximize `gamma - alpha`,
     // so that we don't need many cached powers of 10, but there are some considerations:
     //
     // 1. we want to keep `floor(plus * cached)` within `u32` since it needs a costly division.
@@ -476,35 +476,32 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint,
     }
 }
 
+pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*/ i16) {
+    use flt2dec::strategy::dragon::format_shortest as fallback;
+    match format_shortest_opt(d, buf) {
+        Some(ret) => ret,
+        None => fallback(d, buf),
+    }
+}
+
 #[cfg(test)] #[test]
 fn shortest_sanity_test() {
-    use flt2dec::strategy::dragon::format_shortest as fallback;
-    testing::f64_shortest_sanity_test(|d, buf|
-        format_shortest(d, buf).unwrap_or_else(|| fallback(d, buf)));
-    testing::f32_shortest_sanity_test(|d, buf|
-        format_shortest(d, buf).unwrap_or_else(|| fallback(d, buf)));
+    testing::f64_shortest_sanity_test(format_shortest);
+    testing::f32_shortest_sanity_test(format_shortest);
 }
 
 #[cfg(test)] #[bench]
 fn bench_small_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
-    use flt2dec::strategy::dragon::format_shortest as fallback;
     let decoded = decode(3.141592f64);
-    b.iter(|| {
-        let mut buf = [0; MAX_SIG_DIGITS];
-        format_shortest(&decoded, &mut buf).unwrap_or_else(|| fallback(&decoded, &mut buf))
-    });
+    b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
 }
 
 #[cfg(test)] #[bench]
 fn bench_big_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
-    use flt2dec::strategy::dragon::format_shortest as fallback;
     let v: f64 = Float::max_value();
     let decoded = decode(v);
-    b.iter(|| {
-        let mut buf = [0; MAX_SIG_DIGITS];
-        format_shortest(&decoded, &mut buf).unwrap_or_else(|| fallback(&decoded, &mut buf))
-    });
+    b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
 }
 

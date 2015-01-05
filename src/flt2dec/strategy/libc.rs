@@ -1,0 +1,37 @@
+#![cfg(test)]
+
+extern crate libc;
+
+use std::num::Float;
+use test;
+
+extern {
+    fn snprintf(buf: *mut libc::c_char, len: libc::size_t,
+                fmt: *const libc::c_char, ...) -> libc::c_int;
+}
+
+fn f64_to_buf(buf: &mut [u8], v: f64, scientific: bool) -> uint {
+    let fmt = if scientific {"%e\0"} else {"%f\0"};
+    unsafe {
+        snprintf(buf.as_mut_ptr() as *mut _, buf.len() as libc::size_t,
+                 fmt.as_ptr() as *const _, v) as uint
+    }
+}
+
+#[bench]
+fn bench_small_external(b: &mut test::Bencher) {
+    let mut buf = [0; 32];
+    b.iter(|| {
+        f64_to_buf(&mut buf, 3.141592f64, true)
+    })
+}
+
+#[bench]
+fn bench_big_external(b: &mut test::Bencher) {
+    let v: f64 = Float::max_value();
+    let mut buf = [0; 512];
+    b.iter(|| {
+        f64_to_buf(&mut buf, v, true)
+    })
+}
+

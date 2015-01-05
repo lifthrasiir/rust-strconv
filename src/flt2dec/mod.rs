@@ -7,6 +7,7 @@ mod decoder;
 #[cfg(test)] mod testing;
 pub mod strategy {
     pub mod system;
+    pub mod libc;
     pub mod dragon;
     pub mod grisu;
 }
