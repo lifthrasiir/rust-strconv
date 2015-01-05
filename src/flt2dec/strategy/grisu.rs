@@ -1,3 +1,11 @@
+/*
+Rust adaptation of Grisu3 algorithm described in [1]. It uses about
+1KB of precomputed table, and in turn, it's very quick for most inputs.
+
+[1] Florian Loitsch. 2010. Printing floating-point numbers quickly and
+    accurately with integers. SIGPLAN Not. 45, 6 (June 2010), 233-243.
+*/
+
 use std::num::{Int, Float};
 use std::ops::SliceMut;
 #[cfg(test)] use test;
@@ -9,11 +17,6 @@ use flt2dec::{Decoded, MAX_SIG_DIGITS};
 struct Fp { f: u64, e: i16 }
 
 impl Fp {
-    fn sub(&self, other: &Fp) -> Fp {
-        debug_assert!(self.e == other.e && self.f >= other.f);
-        Fp { f: self.f - other.f, e: self.e }
-    }
-
     fn mul(&self, other: &Fp) -> Fp {
         const MASK: u64 = 0xffffffff;
         let a = self.f >> 32;
@@ -157,7 +160,7 @@ fn cached_power(alpha: i16, gamma: i16) -> (i16, Fp) {
 }
 
 #[cfg(test)] #[test]
-fn test_valid_cached_power() {
+fn test_cached_power() {
     assert_eq!(CACHED_POW10.first().unwrap().1, CACHED_POW10_FIRST_E);
     assert_eq!(CACHED_POW10.last().unwrap().1, CACHED_POW10_LAST_E);
 
@@ -169,6 +172,41 @@ fn test_valid_cached_power() {
         let (_k, cached) = cached_power(low, high);
         assert!(low <= cached.e && cached.e <= high,
                 "cached_power({}, {}) = {} is incorrect", low, high, cached);
+    }
+}
+
+// given `x > 0`, `max_pow10_less_than(x) = (k, 10^k)` such that `10^k < x <= 10^(k+1)`.
+fn max_pow10_less_than(x: u32) -> (u8, u32) {
+    debug_assert!(x > 0);
+
+    const X9: u32 = 10_0000_0000;
+    const X8: u32 =  1_0000_0000;
+    const X7: u32 =    1000_0000;
+    const X6: u32 =     100_0000;
+    const X5: u32 =      10_0000;
+    const X4: u32 =       1_0000;
+    const X3: u32 =         1000;
+    const X2: u32 =          100;
+    const X1: u32 =           10;
+
+    if x < X4 {
+        if x < X2 { if x < X1 {(0,  1)} else {(1, X1)} }
+        else      { if x < X3 {(2, X2)} else {(3, X3)} }
+    } else {
+        if x < X6      { if x < X5 {(4, X4)} else {(5, X5)} }
+        else if x < X8 { if x < X7 {(6, X6)} else {(7, X7)} }
+        else           { if x < X9 {(8, X8)} else {(9, X9)} }
+    }
+}
+
+#[cfg(test)] #[test]
+fn test_max_pow10_less_than() {
+    let mut prevtenk = 1;
+    for k in range(1, 10) {
+        let tenk = prevtenk * 10;
+        assert_eq!(max_pow10_less_than(tenk - 1), (k - 1, prevtenk));
+        assert_eq!(max_pow10_less_than(tenk), (k, tenk));
+        prevtenk = tenk;
     }
 }
 
@@ -224,7 +262,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint,
     //
     // above `minus`, `v` and `plus` are *quantized* approximations (error <= 0.5 ulp).
     // as we don't know the error is positive or negative, we use two approximations spaced equally
-    // and have the maximal error of 1.5 ulp; the combined error will be exactly 2 ulp.
+    // and have the maximal error of 1.5 ulps; the combined error will be exactly 2 ulps.
     //
     // the "unsafe region" is a liberal interval which we initially generate.
     // the "safe region" is a conservative interval which we only accept.
@@ -244,15 +282,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint,
 
     // calculate the largest `10^max_kappa` less than `plus1` (thus `plus1 <= 10^(max_kappa+1)`).
     // this is an upper bound of `kappa` below.
-    // TODO this can be optimized
-    let mut max_kappa = 0;
-    let mut max_ten_kappa = 1; // 10^max_kappa
-    loop { // `plus1 > 1`, so `max_kappa >= 0`. we can skip the initial check.
-        let max_ten_kappa1 = max_ten_kappa * 10;
-        if max_ten_kappa1 > plus1int { break; }
-        max_kappa += 1;
-        max_ten_kappa = max_ten_kappa1;
-    }
+    let (max_kappa, max_ten_kappa) = max_pow10_less_than(plus1int);
 
     let mut i = 0;
     let exp = max_kappa as i16 - minusk + 1;
@@ -270,7 +300,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint,
     let delta1frac = delta1 & ((1 << e) - 1);
 
     // render integral parts, while checking for the accuracy at each step.
-    let mut kappa = max_kappa;
+    let mut kappa = max_kappa as i16;
     let mut ten_kappa = max_ten_kappa; // 10^kappa
     let mut remainder = plus1int; // digits yet to be rendered
     loop { // we always have at least one digit to render, as `plus1 >= 10^kappa`
@@ -294,12 +324,11 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint,
                                   plus1 - v.f, ten_kappa, 1);
         }
 
-        // break the loop when we have rendered exactly `max_kappa` integral digits.
-        // TODO it's actually `max_kappa+1` digits since we defer the next check to the following
-        // loop? also, I think `kappa` can be removed as it is effectively unused
-        if kappa == 0 {
+        // break the loop when we have rendered all integral digits.
+        // the exact number of digits is `max_kappa + 1` as `plus1 < 10^(max_kappa+1)`.
+        if i > max_kappa as uint {
             debug_assert_eq!(ten_kappa, 1);
-            debug_assert_eq!(i, max_kappa + 1);
+            debug_assert_eq!(kappa, 0);
             break;
         }
 
@@ -379,8 +408,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint,
             // plus1 % 10^kappa`. after running the loop body `n` times, `w(n) = plus1 -
             // plus1 % 10^kappa - n * 10^kappa`. we set `plus1w(n) = plus1 - w(n) =
             // plus1 % 10^kappa + n * 10^kappa` (thus `remainder = plus1w(0)`) to simplify checks.
-            // note that `plus1w(n)` is always increasing, but `n` is at most 8 and
-            // it never overflows. (TODO really?)
+            // note that `plus1w(n)` is always increasing.
             //
             // we have three conditions to terminate. any of them will make the loop unable to
             // proceed, but we then have at least one valid representation known to be closest to
@@ -388,6 +416,8 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint,
             //
             // TC1: `w(n) <= v + 1 ulp`, i.e. this is the last repr that can be the closest one.
             // this is equivalent to `plus1 - w(n) = plus1w(n) >= plus1 - (v + 1 ulp) = plus1v_up`.
+            // combined with TC2 (which checks if `w(n+1)` is valid), this prevents the possible
+            // overflow on the calculation of `plus1w(n)`.
             //
             // TC2: `w(n+1) < minus1`, i.e. the next repr definitely does not round to `v`.
             // this is equivalent to `plus1 - w(n) + 10^kappa = plus1w(n) + 10^kappa >

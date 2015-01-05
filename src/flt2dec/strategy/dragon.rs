@@ -1,3 +1,10 @@
+/*
+almost direct (but slightly optimized) Rust translation of Figure 3 of [1].
+
+[1] Burger, R. G. and Dybvig, R. K. 1996. Printing floating-point numbers
+    quickly and accurately. SIGPLAN Not. 31, 5 (May. 1996), 108-116.
+*/
+
 use std::num::{Int, Float};
 use std::cmp::Ordering::{Greater, Equal};
 #[cfg(test)] use test;
@@ -7,13 +14,6 @@ use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 use flt2dec::bignum::Digit32 as Digit;
 use flt2dec::bignum::Big32x36 as Big;
 #[cfg(test)] use flt2dec::testing;
-
-/*
-almost direct (but slightly optimized) Rust translation of Figure 3 of [1].
-
-[1] Burger, R. G. and Dybvig, R. K. 1996. Printing floating-point numbers
-    quickly and accurately. SIGPLAN Not. 31, 5 (May. 1996), 108-116.
-*/
 
 // approximate k_0 = ceil(log_10 (mant * 2^exp))
 fn estimate_scaling_factor(mant: u64, exp: i16) -> i16 {
@@ -71,10 +71,10 @@ fn test_estimate_scaling_factor() {
     }
 }
 
-static POW10: &'static [Digit] = &[1, 10, 100, 1000, 10000, 100000,
-                                   1000000, 10000000, 100000000, 1000000000];
-static TWOPOW10: &'static [Digit] = &[2, 20, 200, 2000, 20000, 200000,
-                                      2000000, 20000000, 200000000, 2000000000];
+const POW10: &'static [Digit] = &[1, 10, 100, 1000, 10000, 100000,
+                                  1000000, 10000000, 100000000, 1000000000];
+const TWOPOW10: &'static [Digit] = &[2, 20, 200, 2000, 20000, 200000,
+                                     2000000, 20000000, 200000000, 2000000000];
 
 fn mul_pow10(mut x: Big, mut n: uint) -> Big {
     let largest = POW10.len() - 1;
@@ -105,6 +105,17 @@ fn test_mul_pow10() {
         assert_eq!(curpow10, prevpow10.mul_small(10));
         prevpow10 = curpow10;
     }
+}
+
+// only usable when `x < 16 * scale`; `scaleN` should be `scale.mul_small(N)`
+fn div_rem_upto_16(mut x: Big, scale: &Big, scale2: &Big, scale4: &Big, scale8: &Big) -> (u8, Big) {
+    let mut d = 0;
+    if x >= *scale8 { x = x.sub(scale8); d += 8; }
+    if x >= *scale4 { x = x.sub(scale4); d += 4; }
+    if x >= *scale2 { x = x.sub(scale2); d += 2; }
+    if x >= *scale  { x = x.sub(scale);  d += 1; }
+    debug_assert!(x < *scale);
+    (d, x)
 }
 
 pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*/ i16) {
@@ -191,13 +202,8 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*
         // where `d[i..j]` is a shorthand for `d[i] * 10^(j-i) + ... + d[j-1] * 10 + d[j]`.
 
         // generate one digit: `d[n] = floor(mant / scale) < 10`.
-        let mut d = 0;
-        if mant >= scale8 { mant = mant.sub(&scale8); d += 8; }
-        if mant >= scale4 { mant = mant.sub(&scale4); d += 4; }
-        if mant >= scale2 { mant = mant.sub(&scale2); d += 2; }
-        if mant >= scale  { mant = mant.sub(&scale);  d += 1; }
-        debug_assert!(mant < scale);
-
+        let (d, rem) = div_rem_upto_16(mant, &scale, &scale2, &scale4, &scale8);
+        mant = rem;
         debug_assert!(d < 10);
         buf[i] = b'0' + d;
         i += 1;
