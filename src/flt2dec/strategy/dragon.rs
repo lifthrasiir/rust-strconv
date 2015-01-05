@@ -309,7 +309,12 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*/ i
     let scale4 = scale.mul_pow2(2);
     let scale8 = scale.mul_pow2(3);
 
-    for c in buf.iter_mut() {
+    let len = buf.len();
+    for i in range(0, len) {
+        if mant.is_zero() { // following digits are all zeroes, we stop here
+            return (i, k); // do *not* try to perform rounding!
+        }
+
         let mut d = 0;
         if mant >= scale8 { mant = mant.sub(&scale8); d += 8; }
         if mant >= scale4 { mant = mant.sub(&scale4); d += 4; }
@@ -317,13 +322,12 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*/ i
         if mant >= scale  { mant = mant.sub(&scale);  d += 1; }
         debug_assert!(mant < scale);
         debug_assert!(d < 10);
-        *c = b'0' + d;
+        buf[i] = b'0' + d;
         mant = mant.mul_small(10);
     }
 
-    // rounding up
+    // rounding up if we stop in the middle of digits
     if mant >= scale.mul_small(5) {
-        let len = buf.len();
         assert!(!round_up(buf, len));
     }
 
@@ -355,5 +359,39 @@ fn bench_big_shortest(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
+}
+
+#[cfg(test)] #[bench]
+fn bench_small_exact_3(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let decoded = decode(3.141592f64);
+    let mut buf = [0; 3];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_big_exact_3(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let v: f64 = Float::max_value();
+    let decoded = decode(v);
+    let mut buf = [0; 3];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_small_exact_inf(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let decoded = decode(3.141592f64);
+    let mut buf = [0; 1024];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_big_exact_inf(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let v: f64 = Float::max_value();
+    let decoded = decode(v);
+    let mut buf = [0; 1024];
+    b.iter(|| format_exact(&decoded, &mut buf));
 }
 

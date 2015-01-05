@@ -72,24 +72,45 @@ Strategy | `u8` | `u16` | `u32` | `u64`
 Floating point number to decimal string for the valid representation (i.e. rounds to
 the original value when converted back). In progress.
 
-There are three possible modes of string conversion:
+There are two possible modes of string conversion:
 
 * **Shortest**: Produces the shortest representation among all numbers that round to given value.
   If there are multiple shortest representations, the closest one should be used.
 * **Exact**: Given the number of digits, produces the exactly rounded representation of given value.
-* **Longest**: Produces the exact representation of given value, with an unbounded number of digits.
+  If the supplied buffer is enough for the exact representation, it stops at the last digit as well.
 
-There are several algorithms available:
+There are several strategies available:
 
 * `dragon` implements a variant of the Dragon algorithm originally described by Steele and White
   and re-refined by Burger and Dybvig (the refinement itself was known but only described later).
   Requires a quite bit of stack (max 2KB), and may pose a problem with constrained environments.
-  (Status: Implemented, longest pending. Roughly tested.)
+  (Status: Implemented. Roughly tested.)
 * `grisu_inexact` implements the Grisu2 algorithm described by Florian Loitsch.
   This *is* inexact, but is very fast and can be used as a replacement to `dragon`.
-  (Status: I have a code but yet to integrate to strconv.)
+  Uses about 1KB of precomputed table. (Status: I have a code but yet to integrate to strconv.)
 * `grisu` implements the Grisu3 algorithm, which is a conditional algorithm similar to Grisu2.
   This returns either a formatted number or an error, in which case the caller should fall back.
-  Both case is very fast so it is best to use with `dragon`.
-  (Status: Implemented, exact and longest pending. Tested exhaustively for f32, roughly for f64.)
+  Both case is very fast so it is best to use with `dragon`. Shares the same precomputed table
+  as `grisu_inexact`. (Status: Implemented, exact pending. Tested exhaustively for f32,
+  roughly for f64.)
+* `system` is a dummy strategy for the comparison; it is Rust's built-in string conversion.
+  This incurs the allocation (there is no way to avoid that), and it produces an inexact result.
+* `libc` is a dummy strategy for the comparison; it is C's `snprintf`.
+
+We use 6 different benchmarks to see the rough performance characteristics of each strategy:
+
+* `small_*` prints `3.141592f64`, `big_*` prints the maximum value for `f64` (~= `1.8 * 10^308`).
+* `*_shortest` tests a "shortest" mode.
+* `*_exact_3` tests an "exact" mode with the buffer of 3 significant digits.
+* `*_exact_inf` tests an "exact" mode with the large enough buffer that any correct strategy will
+  produce all significant digits. (To be exact, we are using 1KB buffer.)
+
+Results from the slow laptop:
+
+Strategy | `big_exact_3` | `big_exact_inf` | `big_shortest` | `small_exact_3` | `small_exact_inf` | `small_shortest`
+---------|---------------|-----------------|----------------|-----------------|-------------------|-----------------
+`dragon` | 4785 (100) | **134363 (1443)** | 14658 (403) | 864 (14) | 9657 (89) | 2216 (20)
+`grisu` | N/A | N/A | **209 (3)** | N/A | N/A | **132 (0)**
+`libc` | 1380 (17) | N/A | N/A | **313 (2)** | N/A | N/A
+`system` | **747 (5)** | 290187 (2558) | N/A | 500 (16) | **328 (3)** | N/A
 

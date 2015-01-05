@@ -76,6 +76,10 @@ macro_rules! define_bignum {
                 $name { size: sz, base: base }
             }
 
+            pub fn is_zero(&self) -> bool {
+                self.base[..self.size].iter().all(|&v| v == 0)
+            }
+
             pub fn add(mut self, other: &$name) -> $name {
                 use std::cmp;
                 use flt2dec::bignum::FullOps;
@@ -335,6 +339,15 @@ mod tests {
                    (Big::from_u64(0xffffff / 123), (0xffffffu64 % 123) as u8));
         assert_eq!(Big::from_u64(0x10000).div_rem_small(123),
                    (Big::from_u64(0x10000 / 123), (0x10000u64 % 123) as u8));
+    }
+
+    #[test]
+    fn test_is_zero() {
+        assert!(Big::from_small(0).is_zero());
+        assert!(!Big::from_small(3).is_zero());
+        assert!(!Big::from_u64(0x123).is_zero());
+        assert!(!Big::from_u64(0xffffff).sub(&Big::from_u64(0xfffffe)).is_zero());
+        assert!(Big::from_u64(0xffffff).sub(&Big::from_u64(0xffffff)).is_zero());
     }
 
     #[test]

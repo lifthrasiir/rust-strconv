@@ -10,8 +10,7 @@ extern {
                 fmt: *const libc::c_char, ...) -> libc::c_int;
 }
 
-fn f64_to_buf(buf: &mut [u8], v: f64, scientific: bool) -> uint {
-    let fmt = if scientific {"%e\0"} else {"%f\0"};
+fn f64_to_buf(buf: &mut [u8], fmt: &str, v: f64) -> uint {
     unsafe {
         snprintf(buf.as_mut_ptr() as *mut _, buf.len() as libc::size_t,
                  fmt.as_ptr() as *const _, v) as uint
@@ -19,19 +18,15 @@ fn f64_to_buf(buf: &mut [u8], v: f64, scientific: bool) -> uint {
 }
 
 #[bench]
-fn bench_small_external(b: &mut test::Bencher) {
+fn bench_small_exact_3(b: &mut test::Bencher) {
     let mut buf = [0; 32];
-    b.iter(|| {
-        f64_to_buf(&mut buf, 3.141592f64, true)
-    })
+    b.iter(|| f64_to_buf(&mut buf, "%.2e\0", 3.141592f64))
 }
 
 #[bench]
-fn bench_big_external(b: &mut test::Bencher) {
+fn bench_big_exact_3(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
-    let mut buf = [0; 512];
-    b.iter(|| {
-        f64_to_buf(&mut buf, v, true)
-    })
+    let mut buf = [0; 32];
+    b.iter(|| f64_to_buf(&mut buf, "%.2e\0", v))
 }
 
