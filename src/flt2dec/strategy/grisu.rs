@@ -175,8 +175,8 @@ fn test_cached_power() {
     }
 }
 
-// given `x > 0`, `max_pow10_less_than(x) = (k, 10^k)` such that `10^k < x <= 10^(k+1)`.
-fn max_pow10_less_than(x: u32) -> (u8, u32) {
+// given `x > 0`, `max_pow10_no_more_than(x) = (k, 10^k)` such that `10^k <= x < 10^(k+1)`.
+fn max_pow10_no_more_than(x: u32) -> (u8, u32) {
     debug_assert!(x > 0);
 
     const X9: u32 = 10_0000_0000;
@@ -200,12 +200,12 @@ fn max_pow10_less_than(x: u32) -> (u8, u32) {
 }
 
 #[cfg(test)] #[test]
-fn test_max_pow10_less_than() {
+fn test_max_pow10_no_more_than() {
     let mut prevtenk = 1;
     for k in range(1, 10) {
         let tenk = prevtenk * 10;
-        assert_eq!(max_pow10_less_than(tenk - 1), (k - 1, prevtenk));
-        assert_eq!(max_pow10_less_than(tenk), (k, tenk));
+        assert_eq!(max_pow10_no_more_than(tenk - 1), (k - 1, prevtenk));
+        assert_eq!(max_pow10_no_more_than(tenk), (k, tenk));
         prevtenk = tenk;
     }
 }
@@ -280,9 +280,9 @@ pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ u
     let plus1int = (plus1 >> e) as u32;
     let plus1frac = plus1 & ((1 << e) - 1);
 
-    // calculate the largest `10^max_kappa` less than `plus1` (thus `plus1 <= 10^(max_kappa+1)`).
+    // calculate the largest `10^max_kappa` no more than `plus1` (thus `plus1 < 10^(max_kappa+1)`).
     // this is an upper bound of `kappa` below.
-    let (max_kappa, max_ten_kappa) = max_pow10_less_than(plus1int);
+    let (max_kappa, max_ten_kappa) = max_pow10_no_more_than(plus1int);
 
     let mut i = 0;
     let exp = max_kappa as i16 - minusk + 1;
