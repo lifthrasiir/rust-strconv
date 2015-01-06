@@ -3,8 +3,6 @@ use std::num::Float;
 use std::slice::bytes;
 use flt2dec::{decode, Decoded, MAX_SIG_DIGITS, round_up};
 
-//use test;
-
 pub use test::Bencher;
 
 macro_rules! check_shortest {
@@ -62,7 +60,7 @@ macro_rules! check_exact {
 // in the following comments, three numbers are spaced by 1 ulp apart,
 // and the second one is being formatted.
 
-pub fn f32_shortest_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
+pub fn f32_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
     // 0.0999999940395355224609375
     // 0.100000001490116119384765625
     // 0.10000000894069671630859375
@@ -102,7 +100,7 @@ pub fn f32_shortest_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
     check_shortest!(f(minf32) => b"1", -44);
 }
 
-pub fn f32_exact_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
+pub fn f32_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
     let maxf32: f32 = Float::max_value();
     let minnormf32: f32 = Float::min_pos_value(None);
     let minf32: f32 = 2.0.powf(-149.0);
@@ -116,7 +114,7 @@ pub fn f32_exact_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
     check_exact!(f(minf32)         => b"1401298464324817070923729583289916131280", -44);
 }
 
-pub fn f64_shortest_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
+pub fn f64_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
     // 0.0999999999999999777955395074968691915273...
     // 0.1000000000000000055511151231257827021181...
     // 0.1000000000000000333066907387546962127089...
@@ -175,7 +173,7 @@ pub fn f64_shortest_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
     check_shortest!(f(minf64) => b"5", -323);
 }
 
-pub fn f64_exact_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
+pub fn f64_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
     let maxf64: f64 = Float::max_value();
     let minnormf64: f64 = Float::min_pos_value(None);
     let minf64: f64 = 2.0.powf(-1074.0);
@@ -209,8 +207,9 @@ pub fn f64_exact_sanity_test(f: |&Decoded, &mut [u8]| -> (uint, i16)) {
                                         7538682506419718265533447265625         ", -323);
 }
 
-pub fn f32_equivalence_test(f: |&Decoded, &mut [u8]| -> Option<(uint, i16)>,
-                            g: |&Decoded, &mut [u8]| -> (uint, i16)) {
+pub fn f32_equivalence_test<F, G>(mut f: F, mut g: G)
+        where F: FnMut(&Decoded, &mut [u8]) -> Option<(uint, i16)>,
+              G: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
     // we have only 2^23 * (2^8 - 1) - 1 = 2,139,095,039 positive finite f32 values,
     // so why not simply testing all of them?
     //

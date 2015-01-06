@@ -5,7 +5,7 @@ use super::digits::{Digits64, Digits32, Digits16, Digits8};
 
 pub use test::Bencher;
 
-pub fn u64_sanity_test(f: |u64| -> Digits64) {
+pub fn u64_sanity_test<F: FnMut(u64) -> Digits64>(mut f: F) {
     assert_eq!(f(                   0)[], b"00000000000000000000");
     assert_eq!(f(                   1)[], b"00000000000000000001");
     assert_eq!(f(                  12)[], b"00000000000000000012");
@@ -15,7 +15,7 @@ pub fn u64_sanity_test(f: |u64| -> Digits64) {
     assert_eq!(f(18446744073709551615)[], b"18446744073709551615");
 }
 
-pub fn u32_sanity_test(f: |u32| -> Digits32) {
+pub fn u32_sanity_test<F: FnMut(u32) -> Digits32>(mut f: F) {
     assert_eq!(f(         0)[], b"0000000000");
     assert_eq!(f(         1)[], b"0000000001");
     assert_eq!(f(        12)[], b"0000000012");
@@ -24,7 +24,7 @@ pub fn u32_sanity_test(f: |u32| -> Digits32) {
     assert_eq!(f(4294967295)[], b"4294967295");
 }
 
-pub fn u16_sanity_test(f: |u16| -> Digits16) {
+pub fn u16_sanity_test<F: FnMut(u16) -> Digits16>(mut f: F) {
     assert_eq!(f(    0)[], b"00000");
     assert_eq!(f(    1)[], b"00001");
     assert_eq!(f(   12)[], b"00012");
@@ -32,7 +32,7 @@ pub fn u16_sanity_test(f: |u16| -> Digits16) {
     assert_eq!(f(65535)[], b"65535");
 }
 
-pub fn u8_sanity_test(f: |u8| -> Digits8) {
+pub fn u8_sanity_test<F: FnMut(u8) -> Digits8>(mut f: F) {
     assert_eq!(f(  0)[], b"000");
     assert_eq!(f(  1)[], b"001");
     assert_eq!(f( 12)[], b"012");
@@ -41,7 +41,7 @@ pub fn u8_sanity_test(f: |u8| -> Digits8) {
 }
 
 #[inline(always)]
-pub fn rotating_bench<I: Int, T>(f: |I| -> T, b: &mut Bencher) {
+pub fn rotating_bench<I: Int, T, F: FnMut(I) -> T>(mut f: F, b: &mut Bencher) {
     b.iter(|| {
         // small integers (4, 5, 6, ..., 3424806)
         let mut n = NumCast::from(4u).unwrap();
