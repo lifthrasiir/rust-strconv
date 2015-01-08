@@ -21,13 +21,13 @@ pub mod strategy {
 pub mod best {
     pub use super::strategy::bcd_earlyexit::u64_to_digits;
 
-    #[cfg(target_arch = "i686")] pub use super::strategy::div100::u32_to_digits;
-    #[cfg(not(target_arch = "i686"))] pub use super::strategy::div100_earlyexit::u32_to_digits;
+    #[cfg(target_arch = "i686")] pub use super::strategy::div100_earlyexit::u32_to_digits;
+    #[cfg(not(target_arch = "i686"))] pub use super::strategy::div100::u32_to_digits;
 
     pub use super::strategy::div100::u16_to_digits;
 
     #[cfg(target_arch = "i686")] pub use super::strategy::div100_earlyexit::u8_to_digits;
-    #[cfg(not(target_arch = "i686"))] pub use super::strategy::div100::u8_to_digits;
+    #[cfg(not(target_arch = "i686"))] pub use super::strategy::naive::u8_to_digits;
 }
 
 pub struct UintToDecFunc<I, T>(pub I, pub fn(I) -> T);
