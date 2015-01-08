@@ -246,7 +246,7 @@ pub fn f32_equivalence_test<F, G>(mut f: F, mut g: G)
     }
     println!("done, ignored={} passed={} failed={}",
              nignored, npassed, ntested - nignored - npassed);
-    assert!(nignored + npassed < ntested,
+    assert!(nignored + npassed == ntested,
             "{} out of {} f32 values returns an incorrect value!",
             ntested - nignored - npassed, 0x7f7fffffu32);
 }

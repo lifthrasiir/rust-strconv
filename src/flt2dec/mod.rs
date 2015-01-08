@@ -1,7 +1,7 @@
 pub use self::decoder::{decode, Decoded};
 
 mod intrin;
-mod bignum;
+#[macro_use] mod bignum;
 mod decoder;
 
 #[cfg(test)] mod testing;

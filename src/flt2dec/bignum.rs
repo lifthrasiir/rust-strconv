@@ -1,5 +1,3 @@
-#![macro_escape]
-
 use std::mem;
 use super::intrin;
 

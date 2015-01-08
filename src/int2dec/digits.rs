@@ -1,5 +1,3 @@
-#![macro_escape]
-
 pub const NDIGITS64: uint = 20; // 1844 6744 0737 0955 1615
 pub const NDIGITS32: uint = 10; // 42 9496 7295
 pub const NDIGITS16: uint = 5; // 6 5535
