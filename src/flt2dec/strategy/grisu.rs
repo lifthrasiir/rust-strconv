@@ -7,7 +7,6 @@ Rust adaptation of Grisu3 algorithm described in [1]. It uses about
 */
 
 use std::num::{Int, Float};
-use std::ops::SliceMut;
 #[cfg(test)] use test;
 
 use flt2dec::{Decoded, MAX_SIG_DIGITS};
@@ -47,7 +46,7 @@ impl Fp {
     fn normalize_to(&self, e: i16) -> Fp {
         let edelta = self.e - e;
         assert!(edelta >= 0);
-        let edelta = edelta as uint;
+        let edelta = edelta as usize;
         assert_eq!(self.f << edelta >> edelta, self.f);
         Fp { f: self.f << edelta, e: e }
     }
@@ -154,7 +153,7 @@ fn cached_power(alpha: i16, gamma: i16) -> (i16, Fp) {
     let range = (CACHED_POW10.len() as i32) - 1;
     let domain = (CACHED_POW10_LAST_E - CACHED_POW10_FIRST_E) as i32;
     let idx = ((gamma as i32) - offset) * range / domain;
-    let (f, e, k) = CACHED_POW10[idx as uint];
+    let (f, e, k) = CACHED_POW10[idx as usize];
     debug_assert!(alpha <= e && e <= gamma);
     (k, Fp { f: f, e: e })
 }
@@ -171,7 +170,7 @@ fn test_cached_power() {
         let high = gamma - e - 64;
         let (_k, cached) = cached_power(low, high);
         assert!(low <= cached.e && cached.e <= high,
-                "cached_power({}, {}) = {} is incorrect", low, high, cached);
+                "cached_power({}, {}) = {:?} is incorrect", low, high, cached);
     }
 }
 
@@ -210,7 +209,8 @@ fn test_max_pow10_no_more_than() {
     }
 }
 
-pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ uint, /*exp*/ i16)> {
+pub fn format_shortest_opt(d: &Decoded,
+                           buf: &mut [u8]) -> Option<(/*#digits*/ usize, /*exp*/ i16)> {
     assert!(d.mant > 0);
     assert!(d.minus > 0);
     assert!(d.plus > 0);
@@ -272,7 +272,7 @@ pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ u
 //  let plus0 = plus.f - 1; // only for explanation
 //  let minus0 = minus.f + 1; // only for explanation
     let minus1 = minus.f - 1;
-    let e = -plus.e as uint; // shared exponent
+    let e = -plus.e as usize; // shared exponent
 
     // divide `plus1` into integral and fractional parts.
     // integral parts are guaranteed to fit in u32, since cached power guarantees `plus < 2^32`
@@ -296,7 +296,7 @@ pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ u
     // (e.g. `x` = 32000, `y` = 32777; `kappa` = 2 since `y mod 10^3 = 777 < y - x = 777`.)
     // the algorithm relies on the later verification phase to exclude `y`.
     let delta1 = plus1 - minus1;
-//  let delta1int = (delta1 >> e) as uint; // only for explanation
+//  let delta1int = (delta1 >> e) as usize; // only for explanation
     let delta1frac = delta1 & ((1 << e) - 1);
 
     // render integral parts, while checking for the accuracy at each step.
@@ -320,13 +320,12 @@ pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ u
         if plus1rem < delta1 {
             // `plus1 % 10^kappa < delta1 = plus1 - minus1`; we've found the correct `kappa`.
             let ten_kappa = (ten_kappa as u64) << e; // scale 10^kappa back to the shared exponent
-            return round_and_weed(buf.slice_to_or_fail_mut(&i), exp, plus1rem, delta1,
-                                  plus1 - v.f, ten_kappa, 1);
+            return round_and_weed(&mut buf[..i], exp, plus1rem, delta1, plus1 - v.f, ten_kappa, 1);
         }
 
         // break the loop when we have rendered all integral digits.
         // the exact number of digits is `max_kappa + 1` as `plus1 < 10^(max_kappa+1)`.
-        if i > max_kappa as uint {
+        if i > max_kappa as usize {
             debug_assert_eq!(ten_kappa, 1);
             debug_assert_eq!(kappa, 0);
             break;
@@ -362,7 +361,7 @@ pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ u
 
         if r < threshold {
             let ten_kappa = 1 << e; // implicit divisor
-            return round_and_weed(buf.slice_to_or_fail_mut(&i), exp, r, threshold,
+            return round_and_weed(&mut buf[..i], exp, r, threshold,
                                   (plus1 - v.f) * ulp, ten_kappa, ulp);
         }
 
@@ -388,7 +387,7 @@ pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ u
     // - `ten_kappa = 10^kappa * k`
     // - `ulp = 2^-e * k`
     fn round_and_weed(buf: &mut [u8], exp: i16, remainder: u64, threshold: u64, plus1v: u64,
-                      ten_kappa: u64, ulp: u64) -> Option<(uint, i16)> {
+                      ten_kappa: u64, ulp: u64) -> Option<(usize, i16)> {
         assert!(!buf.is_empty());
 
         // produce two approximations to `v` (actually `plus1 - v`) within 1.5 ulps.
@@ -476,7 +475,7 @@ pub fn format_shortest_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ u
     }
 }
 
-pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*/ i16) {
+pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ i16) {
     use flt2dec::strategy::dragon::format_shortest as fallback;
     match format_shortest_opt(d, buf) {
         Some(ret) => ret,

@@ -10,10 +10,10 @@ extern {
                 fmt: *const libc::c_char, ...) -> libc::c_int;
 }
 
-fn f64_to_buf(buf: &mut [u8], fmt: &str, v: f64) -> uint {
+fn f64_to_buf(buf: &mut [u8], fmt: &str, v: f64) -> usize {
     unsafe {
         snprintf(buf.as_mut_ptr() as *mut _, buf.len() as libc::size_t,
-                 fmt.as_ptr() as *const _, v) as uint
+                 fmt.as_ptr() as *const _, v) as usize
     }
 }
 

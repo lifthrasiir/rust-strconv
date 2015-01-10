@@ -76,7 +76,7 @@ const POW10: &'static [Digit] = &[1, 10, 100, 1000, 10000, 100000,
 const TWOPOW10: &'static [Digit] = &[2, 20, 200, 2000, 20000, 200000,
                                      2000000, 20000000, 200000000, 2000000000];
 
-fn mul_pow10(mut x: Big, mut n: uint) -> Big {
+fn mul_pow10(mut x: Big, mut n: usize) -> Big {
     let largest = POW10.len() - 1;
     while n > largest {
         x = x.mul_small(POW10[largest]);
@@ -88,7 +88,7 @@ fn mul_pow10(mut x: Big, mut n: uint) -> Big {
     x
 }
 
-fn div_2pow10(mut x: Big, mut n: uint) -> Big {
+fn div_2pow10(mut x: Big, mut n: usize) -> Big {
     let largest = POW10.len() - 1;
     while n > largest {
         x = x.div_rem_small(POW10[largest]).0;
@@ -118,7 +118,7 @@ fn div_rem_upto_16(mut x: Big, scale: &Big, scale2: &Big, scale4: &Big, scale8: 
     (d, x)
 }
 
-pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*/ i16) {
+pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ i16) {
     // the number `v` to format is known to be:
     // - equal to `mant * 2^exp`;
     // - preceded by `(mant - 2 * minus) * 2^exp` in the original type; and
@@ -154,20 +154,20 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*
     let mut plus = Big::from_u64(d.plus);
     let mut scale = Big::from_small(1);
     if d.exp < 0 {
-        scale = scale.mul_pow2(-d.exp as uint);
+        scale = scale.mul_pow2(-d.exp as usize);
     } else {
-        mant = mant.mul_pow2(d.exp as uint);
-        minus = minus.mul_pow2(d.exp as uint);
-        plus = plus.mul_pow2(d.exp as uint);
+        mant = mant.mul_pow2(d.exp as usize);
+        minus = minus.mul_pow2(d.exp as usize);
+        plus = plus.mul_pow2(d.exp as usize);
     }
 
     // divide `mant` by `10^k`. now `scale / 10 < mant + plus <= scale * 10`.
     if k >= 0 {
-        scale = mul_pow10(scale, k as uint);
+        scale = mul_pow10(scale, k as usize);
     } else {
-        mant = mul_pow10(mant, -k as uint);
-        minus = mul_pow10(minus, -k as uint);
-        plus = mul_pow10(plus, -k as uint);
+        mant = mul_pow10(mant, -k as usize);
+        minus = mul_pow10(minus, -k as usize);
+        plus = mul_pow10(plus, -k as usize);
     }
 
     // fixup when `mant + plus > scale` (or `>=`).
@@ -192,7 +192,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*
 
     let mut down;
     let mut up;
-    let mut i = 0u;
+    let mut i = 0;
     loop {
         // invariants, where `d[0..n-1]` are digits generated so far:
         // - `v = mant / scale * 10^(k-n-1) + d[0..n-1] * 10^(k-n)`
@@ -265,7 +265,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*
     (i, k)
 }
 
-pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*/ i16) {
+pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ i16) {
     // the stripped-down version of Dragon for fixed-size output.
 
     assert!(d.mant > 0);
@@ -281,16 +281,16 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ uint, /*exp*/ i
     let mut mant = Big::from_u64(d.mant);
     let mut scale = Big::from_small(1);
     if d.exp < 0 {
-        scale = scale.mul_pow2(-d.exp as uint);
+        scale = scale.mul_pow2(-d.exp as usize);
     } else {
-        mant = mant.mul_pow2(d.exp as uint);
+        mant = mant.mul_pow2(d.exp as usize);
     }
 
     // divide `mant` by `10^k`. now `scale / 10 < mant <= scale * 10`.
     if k >= 0 {
-        scale = mul_pow10(scale, k as uint);
+        scale = mul_pow10(scale, k as usize);
     } else {
-        mant = mul_pow10(mant, -k as uint);
+        mant = mul_pow10(mant, -k as usize);
     }
 
     // fixup when `mant + plus >= scale`, where `plus / scale = 10^-buf.len() / 2`.

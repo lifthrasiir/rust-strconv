@@ -9,7 +9,7 @@ macro_rules! check_shortest {
     ($fmt:ident($v:expr) => $buf:expr, $exp:expr) => ({
         let mut buf = [0; MAX_SIG_DIGITS];
         let (len, k) = $fmt(&decode($v), &mut buf);
-        assert_eq!((str::from_utf8(buf[..len]).unwrap(), k),
+        assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
                    (str::from_utf8($buf).unwrap(), $exp));
     })
 }
@@ -41,8 +41,8 @@ macro_rules! check_exact {
                 if round_up(&mut expected_, i) { expectedk += 1; }
             }
 
-            assert_eq!((str::from_utf8(buf[..len]).unwrap(), k),
-                       (str::from_utf8(expected_[..len]).unwrap(), expectedk));
+            assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
+                       (str::from_utf8(&expected_[..len]).unwrap(), expectedk));
         }
 
         // check infinite zero digits
@@ -50,8 +50,8 @@ macro_rules! check_exact {
             for i in range(cut, expected.len() - 1) {
                 let (len, k) = $fmt(&decoded, buf.slice_to_mut(i));
                 assert_eq!(len, cut);
-                assert_eq!((str::from_utf8(buf[..len]).unwrap(), k),
-                           (str::from_utf8(expected[..len]).unwrap(), expectedk));
+                assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
+                           (str::from_utf8(&expected[..len]).unwrap(), expectedk));
             }
         }
     })
@@ -60,7 +60,7 @@ macro_rules! check_exact {
 // in the following comments, three numbers are spaced by 1 ulp apart,
 // and the second one is being formatted.
 
-pub fn f32_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
+pub fn f32_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     // 0.0999999940395355224609375
     // 0.100000001490116119384765625
     // 0.10000000894069671630859375
@@ -100,7 +100,7 @@ pub fn f32_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8])
     check_shortest!(f(minf32) => b"1", -44);
 }
 
-pub fn f32_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
+pub fn f32_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     let maxf32: f32 = Float::max_value();
     let minnormf32: f32 = Float::min_pos_value(None);
     let minf32: f32 = 2.0.powf(-149.0);
@@ -114,7 +114,7 @@ pub fn f32_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) ->
     check_exact!(f(minf32)         => b"1401298464324817070923729583289916131280", -44);
 }
 
-pub fn f64_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
+pub fn f64_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     // 0.0999999999999999777955395074968691915273...
     // 0.1000000000000000055511151231257827021181...
     // 0.1000000000000000333066907387546962127089...
@@ -173,7 +173,7 @@ pub fn f64_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8])
     check_shortest!(f(minf64) => b"5", -323);
 }
 
-pub fn f64_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
+pub fn f64_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     let maxf64: f64 = Float::max_value();
     let minnormf64: f64 = Float::min_pos_value(None);
     let minf64: f64 = 2.0.powf(-1074.0);
@@ -208,8 +208,8 @@ pub fn f64_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) ->
 }
 
 pub fn f32_equivalence_test<F, G>(mut f: F, mut g: G)
-        where F: FnMut(&Decoded, &mut [u8]) -> Option<(uint, i16)>,
-              G: FnMut(&Decoded, &mut [u8]) -> (uint, i16) {
+        where F: FnMut(&Decoded, &mut [u8]) -> Option<(usize, i16)>,
+              G: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     // we have only 2^23 * (2^8 - 1) - 1 = 2,139,095,039 positive finite f32 values,
     // so why not simply testing all of them?
     //
@@ -232,12 +232,12 @@ pub fn f32_equivalence_test<F, G>(mut f: F, mut g: G)
         if let Some((len1, e1)) = f(&decoded, &mut buf1) {
             let mut buf2 = [0; MAX_SIG_DIGITS];
             let (len2, e2) = g(&decoded, &mut buf2);
-            if e1 == e2 && buf1[..len1] == buf2[..len2] {
+            if e1 == e2 && &buf1[..len1] == &buf2[..len2] {
                 npassed += 1;
             } else {
                 println!("equivalent test failed, i={:x} f(i)={}e{} g(i)={}e{}",
-                         i, str::from_utf8(buf1[..len1]).unwrap(), e1,
-                            str::from_utf8(buf2[..len2]).unwrap(), e2);
+                         i, str::from_utf8(&buf1[..len1]).unwrap(), e1,
+                            str::from_utf8(&buf2[..len2]).unwrap(), e2);
             }
         } else {
             nignored += 1;

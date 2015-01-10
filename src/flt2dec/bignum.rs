@@ -47,10 +47,10 @@ impl_full_ops! {
 }
 
 macro_rules! define_bignum {
-    ($name:ident: [$ty:ty; $n:expr]) => (
+    ($name:ident: type=$ty:ty, n=$n:expr) => (
         #[derive(Copy)]
         pub struct $name {
-            size: uint, // base[size..] is known to be zero
+            size: usize, // base[size..] is known to be zero
             base: [$ty; $n] // [a, b, c, ...] represents a + b*n + c*n^2 + ...
         }
 
@@ -131,7 +131,7 @@ macro_rules! define_bignum {
                 self
             }
 
-            pub fn mul_pow2(mut self, bits: uint) -> $name {
+            pub fn mul_pow2(mut self, bits: usize) -> $name {
                 use std::mem;
 
                 let digitbits = mem::size_of::<$ty>() * 8;
@@ -236,11 +236,11 @@ macro_rules! define_bignum {
 }
 
 pub type Digit32 = u32;
-define_bignum!(Big32x36: [Digit32; 36]);
+define_bignum!(Big32x36: type=Digit32, n=36);
 
 #[cfg(test)]
 mod tests {
-    define_bignum!(Big: [u8; 3]);
+    define_bignum!(Big: type=u8, n=3);
 
     #[test]
     #[should_fail]
@@ -355,14 +355,14 @@ mod tests {
     }
 
     #[test]
-    fn test_to_string() {
-        assert_eq!(Big::from_u64(0).to_string(), "0x0");
-        assert_eq!(Big::from_u64(0x1).to_string(), "0x1");
-        assert_eq!(Big::from_u64(0x12).to_string(), "0x12");
-        assert_eq!(Big::from_u64(0x123).to_string(), "0x1_23");
-        assert_eq!(Big::from_u64(0x1234).to_string(), "0x12_34");
-        assert_eq!(Big::from_u64(0x12345).to_string(), "0x1_23_45");
-        assert_eq!(Big::from_u64(0x123456).to_string(), "0x12_34_56");
+    fn test_fmt() {
+        assert_eq!(format!("{:?}", Big::from_u64(0)), "0x0");
+        assert_eq!(format!("{:?}", Big::from_u64(0x1)), "0x1");
+        assert_eq!(format!("{:?}", Big::from_u64(0x12)), "0x12");
+        assert_eq!(format!("{:?}", Big::from_u64(0x123)), "0x1_23");
+        assert_eq!(format!("{:?}", Big::from_u64(0x1234)), "0x12_34");
+        assert_eq!(format!("{:?}", Big::from_u64(0x12345)), "0x1_23_45");
+        assert_eq!(format!("{:?}", Big::from_u64(0x123456)), "0x12_34_56");
     }
 }
 

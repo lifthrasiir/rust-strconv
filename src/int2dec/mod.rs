@@ -31,21 +31,21 @@ pub mod best {
 }
 
 pub struct UintToDecFunc<I, T>(pub I, pub fn(I) -> T);
-pub struct UintToDec<I>(pub I);
+#[derive(Show)] pub struct UintToDec<I>(pub I);
 
 macro_rules! impl_uint_to_dec {
     ($t:ty, $Digits:ty, $default_conv:ident) => (
-        impl<I: Int> fmt::Show for UintToDecFunc<I, $Digits> {
+        impl<I: Int> fmt::String for UintToDecFunc<I, $Digits> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 let UintToDecFunc(num, conv) = *self;
                 let buf = conv(num);
                 let last = buf.len() - 1;
                 let start = buf[..last].iter().position(|&c| c != b'0').unwrap_or(last);
-                f.pad_integral(true, "", unsafe {str::from_utf8_unchecked(buf[start..])})
+                f.pad_integral(true, "", unsafe {str::from_utf8_unchecked(&buf[start..])})
             }
         }
 
-        impl fmt::Show for UintToDec<$t> {
+        impl fmt::String for UintToDec<$t> {
             #[inline]
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 let UintToDec(num) = *self;
@@ -63,7 +63,7 @@ impl_uint_to_dec!(u8, Digits8, u8_to_digits);
 #[cfg(test)] #[test]
 fn sanity_test() {
     let mut n = 1u64;
-    for _ in range(0, 64u) {
+    for _ in range(0, 64) {
         assert_eq!((n as u64).to_string(), UintToDec(n as u64).to_string());
         assert_eq!((n as u32).to_string(), UintToDec(n as u32).to_string());
         assert_eq!((n as u16).to_string(), UintToDec(n as u16).to_string());
@@ -81,7 +81,7 @@ macro_rules! make_bench {
                 let mut n: $t = 1;
                 let mut buf = [0; 4096];
                 let mut w = io::BufWriter::new(&mut buf);
-                for _ in range(0, 64u) {
+                for _ in range(0, 64) {
                     let _ = write!(&mut w, "{}", n);
                     n *= 3;
                 }
@@ -95,7 +95,7 @@ macro_rules! make_bench {
                 let mut n: $t = 1;
                 let mut buf = [0; 4096];
                 let mut w = io::BufWriter::new(&mut buf);
-                for _ in range(0, 64u) {
+                for _ in range(0, 64) {
                     let _ = write!(&mut w, "{}", UintToDec(n));
                     n *= 3;
                 }

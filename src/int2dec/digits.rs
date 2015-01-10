@@ -1,7 +1,7 @@
-pub const NDIGITS64: uint = 20; // 1844 6744 0737 0955 1615
-pub const NDIGITS32: uint = 10; // 42 9496 7295
-pub const NDIGITS16: uint = 5; // 6 5535
-pub const NDIGITS8: uint = 3; // 255
+pub const NDIGITS64: usize = 20; // 1844 6744 0737 0955 1615
+pub const NDIGITS32: usize = 10; // 42 9496 7295
+pub const NDIGITS16: usize = 5; // 6 5535
+pub const NDIGITS8: usize = 3; // 255
 
 pub type Digit = u8;
 
@@ -15,6 +15,6 @@ pub static TENS: &'static [u8] = b"000000000011111111112222222222333333333344444
 pub static ONES: &'static [u8] = b"01234567890123456789012345678901234567890123456789\
                                    01234567890123456789012345678901234567890123456789";
 
-macro_rules! tens { ($i:expr) => (TENS[$i as uint]) }
-macro_rules! ones { ($i:expr) => (ONES[$i as uint]) }
+macro_rules! tens { ($i:expr) => (TENS[$i as usize]) }
+macro_rules! ones { ($i:expr) => (ONES[$i as usize]) }
 

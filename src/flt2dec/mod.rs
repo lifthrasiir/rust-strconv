@@ -15,11 +15,11 @@ pub mod strategy {
 // it is a bit non-trivial to derive, but this is one plus the maximal number of
 // significant decimal digits from formatting algorithms with the shortest result.
 // the exact formula for this is: ceil(# bits in mantissa * log_10 2 + 1).
-pub const MAX_SIG_DIGITS: uint = 17;
+pub const MAX_SIG_DIGITS: usize = 17;
 
 // when d[..n] contains decimal digits, increase the last digit and propagate carry.
 // returns true when it causes the length change.
-fn round_up(d: &mut [u8], n: uint) -> bool {
+fn round_up(d: &mut [u8], n: usize) -> bool {
     match d[..n].iter().rposition(|&c| c != b'9') {
         Some(i) => { // d[i+1..n] is all nines
             d[i] += 1;
