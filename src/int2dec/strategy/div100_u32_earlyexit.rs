@@ -7,26 +7,36 @@ use int2dec::digits::{ONES, TENS};
 
 pub fn u64_to_digits(n: u64) -> Digits64 {
     let mut buf: Digits64 = [b'0'; NDIGITS64];
+    if n <= 0 { return buf; }
 
     let (xy, z) = div_rem(n, 10000);
 
-    let n = z as u32;
-    if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[18] = tens!(r); buf[19] = ones!(r);
-    if n == 0 { return buf; } let r = n;                    buf[16] = tens!(r); buf[17] = ones!(r);
+    let m = z as u32;
+    let (m, r) = div_rem(m, 100); buf[18] = tens!(r); buf[19] = ones!(r);
+    if n <= 99 { return buf; }
+    let r = m;                    buf[16] = tens!(r); buf[17] = ones!(r);
+    if n <= 9999 { return buf; }
 
     let (x, y) = div_rem(xy, 100000000);
 
-    let n = y as u32;
-    if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[14] = tens!(r); buf[15] = ones!(r);
-    if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[12] = tens!(r); buf[13] = ones!(r);
-    if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[10] = tens!(r); buf[11] = ones!(r);
-    if n == 0 { return buf; } let r = n;                    buf[ 8] = tens!(r); buf[ 9] = ones!(r);
+    let m = y as u32;
+    let (m, r) = div_rem(m, 100); buf[14] = tens!(r); buf[15] = ones!(r);
+    if n <= 99_9999 { return buf; }
+    let (m, r) = div_rem(m, 100); buf[12] = tens!(r); buf[13] = ones!(r);
+    if n <= 9999_9999 { return buf; }
+    let (m, r) = div_rem(m, 100); buf[10] = tens!(r); buf[11] = ones!(r);
+    if n <= 99_9999_9999 { return buf; }
+    let r = m;                    buf[ 8] = tens!(r); buf[ 9] = ones!(r);
+    if n <= 9999_9999_9999 { return buf; }
 
-    let n = x as u32;
-    if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 6] = tens!(r); buf[ 7] = ones!(r);
-    if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 4] = tens!(r); buf[ 5] = ones!(r);
-    if n == 0 { return buf; } let (n, r) = div_rem(n, 100); buf[ 2] = tens!(r); buf[ 3] = ones!(r);
-    if n == 0 { return buf; } let r = n;                    buf[ 0] = tens!(r); buf[ 1] = ones!(r);
+    let m = x as u32;
+    let (m, r) = div_rem(m, 100); buf[ 6] = tens!(r); buf[ 7] = ones!(r);
+    if n <= 99_9999_9999_9999 { return buf; }
+    let (m, r) = div_rem(m, 100); buf[ 4] = tens!(r); buf[ 5] = ones!(r);
+    if n <= 9999_9999_9999_9999 { return buf; }
+    let (m, r) = div_rem(m, 100); buf[ 2] = tens!(r); buf[ 3] = ones!(r);
+    if n <= 99_9999_9999_9999_9999 { return buf; }
+    let r = m;                    buf[ 0] = tens!(r); buf[ 1] = ones!(r);
 
     buf
 }
