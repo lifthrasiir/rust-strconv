@@ -17,14 +17,16 @@ for line in sys.stdin:
     avg = int(avg)
     std = int(std)
 
-    benches.setdefault(category, {}).setdefault(strategy, {})[column] = '%s (%s)' % (avg, std)
+    benches.setdefault(category, {}).setdefault(strategy, {})[column] = '%s (%s)' % (avg, std), avg
     bestpercol = best.setdefault(category, {})
-    if column not in bestpercol or bestpercol[column][0] > avg:
-        bestpercol[column] = avg, strategy
+    if column not in bestpercol or bestpercol[column] > avg:
+        bestpercol[column] = avg
 
-for category, columns in best.items():
-    for column, (_, strategy) in columns.items():
-        benches[category][strategy][column] = '**%s**' % benches[category][strategy][column]
+for category, bestcolumns in best.items():
+    for column, bestavg in bestcolumns.items():
+        for columns in benches[category].values():
+            if column in columns and columns[column][1] < bestavg * 1.05:
+                columns[column] = '**%s**' % columns[column][0], columns[column][1]
 
 def natural_key(key):
     return [int(i) if i.isdigit() else i.lower() for i in re.split(r'([0-9]+)', key)]
@@ -36,8 +38,10 @@ for category, rows in benches.items():
     print 'Strategy | %s' % ' | '.join('`%s`' % i for i in columns)
     print '---------|-%s' % '-|-'.join('-%s-' % ('-'*len(i)) for i in columns)
     rows = list(rows.items())
-    rows.sort(key=lambda (k,_): (not k.lower().startswith('naive'), natural_key(k))) # naive first
+    rows.sort(key=lambda (k,_): (k == 'best',                       # best last
+                                 not k.lower().startswith('naive'), # naive first
+                                 natural_key(k)))
     for strategy, results in rows:
-        print '`%s` | %s' % (strategy, ' | '.join(results.get(i, 'N/A') for i in columns))
+        print '`%s` | %s' % (strategy, ' | '.join(results.get(i, ('N/A',))[0] for i in columns))
     print
 
