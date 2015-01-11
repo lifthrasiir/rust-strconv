@@ -9,7 +9,6 @@ use std::num::{Int, Float};
 use std::cmp::Ordering::{Greater, Equal};
 #[cfg(test)] use test;
 
-use flt2dec::intrin;
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 use flt2dec::bignum::Digit32 as Digit;
 use flt2dec::bignum::Big32x36 as Big;
@@ -18,7 +17,7 @@ use flt2dec::bignum::Big32x36 as Big;
 // approximate k_0 = ceil(log_10 (mant * 2^exp))
 fn estimate_scaling_factor(mant: u64, exp: i16) -> i16 {
     // 2^(nbits-1) < mant <= 2^nbits if mant > 0
-    let nbits = 64 - intrin::ctlz64(mant - 1) as i64;
+    let nbits = 64 - (mant - 1).leading_zeros() as i64;
     (((nbits + exp as i64) * 1292913986) >> 32) as i16
 }
 

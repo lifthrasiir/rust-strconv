@@ -14,7 +14,3 @@ pub fn u32_add_with_overflow(x: u32, y: u32) -> (u32, bool) {
     unsafe {intrinsics::u32_add_with_overflow(x, y)}
 }
 
-pub fn ctlz64(x: u64) -> u64 {
-    unsafe {intrinsics::ctlz64(x)}
-}
-
