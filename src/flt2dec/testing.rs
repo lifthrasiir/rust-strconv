@@ -220,7 +220,7 @@ pub fn f32_equivalence_test<F, G>(mut f: F, mut g: G)
     let mut npassed = 0; // f(x) = Some(g(x))
     let mut nignored = 0; // f(x) = None
 
-    for i in 0x00000001..0x7f800000 {
+    for i in 0x00000001u32..0x7f800000 {
         if (i & 0xfffff) == 0 {
             println!("in progress, {:x}/{:x} (ignored={} passed={} failed={})",
                      i, 0x7f800000u32, nignored, npassed, ntested - nignored - npassed);
