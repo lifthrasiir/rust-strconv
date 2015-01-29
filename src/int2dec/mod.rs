@@ -71,7 +71,7 @@ macro_rules! make_bench {
         #[cfg(test)] #[bench]
         fn $system(b: &mut test::Bencher) {
             b.iter(|| {
-                use std::io;
+                use std::old_io as io;
                 let mut n: $t = 1;
                 let mut buf = [0; 4096];
                 let mut w = io::BufWriter::new(&mut buf);
@@ -85,7 +85,7 @@ macro_rules! make_bench {
         #[cfg(test)] #[bench]
         fn $best(b: &mut test::Bencher) {
             b.iter(|| {
-                use std::io;
+                use std::old_io as io;
                 let mut n: $t = 1;
                 let mut buf = [0; 4096];
                 let mut w = io::BufWriter::new(&mut buf);
