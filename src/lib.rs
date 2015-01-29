@@ -1,7 +1,7 @@
-#![allow(unstable)]
-#![feature(slicing_syntax)]
+#![feature(core, std_misc)] // lib stability features as per RFC #507
+#![cfg_attr(test, feature(io, collections, libc, test))] // ditto
 
-extern crate test;
+#[cfg(test)] extern crate test;
 
 mod num;
 

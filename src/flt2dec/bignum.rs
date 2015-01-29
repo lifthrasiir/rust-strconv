@@ -218,7 +218,7 @@ macro_rules! define_bignum {
             }
         }
 
-        impl ::std::fmt::Show for $name {
+        impl ::std::fmt::Debug for $name {
             fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 use std::mem;
 

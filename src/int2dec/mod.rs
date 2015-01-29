@@ -29,7 +29,7 @@ pub struct UintToDecFunc<I, T>(pub I, pub fn(I) -> T);
 
 macro_rules! impl_uint_to_dec {
     ($t:ty, $Digits:ty, $default_conv:ident) => (
-        impl<I: Int> fmt::String for UintToDecFunc<I, $Digits> {
+        impl<I: Int> fmt::Display for UintToDecFunc<I, $Digits> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 let UintToDecFunc(num, conv) = *self;
                 let buf = conv(num);
@@ -39,7 +39,7 @@ macro_rules! impl_uint_to_dec {
             }
         }
 
-        impl fmt::String for UintToDec<$t> {
+        impl fmt::Display for UintToDec<$t> {
             #[inline]
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 let UintToDec(num) = *self;
