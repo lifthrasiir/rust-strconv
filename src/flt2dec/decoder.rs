@@ -1,6 +1,6 @@
 use std::num::Float;
 
-#[derive(Copy, Show)]
+#[derive(Copy, Debug)]
 pub struct Decoded {
     // the scaled mantissa. `original value = mant * 2^exp`.
     pub mant: u64,

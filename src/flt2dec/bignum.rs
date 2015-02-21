@@ -188,7 +188,7 @@ macro_rules! define_bignum {
         }
 
         impl PartialEq for $name {
-            fn eq(&self, other: &$name) -> bool { self.base[] == other.base[] }
+            fn eq(&self, other: &$name) -> bool { self.base[..] == other.base[..] }
         }
 
         impl Eq for $name {

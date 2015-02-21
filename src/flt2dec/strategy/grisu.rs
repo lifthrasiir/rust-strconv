@@ -12,7 +12,7 @@ use std::num::{Int, Float};
 use flt2dec::{Decoded, MAX_SIG_DIGITS};
 #[cfg(test)] use flt2dec::testing;
 
-#[derive(Copy, Show)]
+#[derive(Copy, Debug)]
 struct Fp { f: u64, e: i16 }
 
 impl Fp {
@@ -61,7 +61,8 @@ for i in xrange(-308, 333, 8):
     f = ((f << 64 >> (l-1)) + 1) >> 1; e += l - 64
     print '    (%#018x, %5d, %4d),' % (f, e, i)
 */
-const CACHED_POW10: &'static [(u64, i16, i16)] = &[ // (f, e, k)
+// XXX const ref to static array seems to ICE (#22540)
+static CACHED_POW10: [(u64, i16, i16); 81] = [ // (f, e, k)
     (0xe61acf033d1a45df, -1087, -308),
     (0xab70fe17c79ac6ca, -1060, -300),
     (0xff77b1fcbebcdc4f, -1034, -292),

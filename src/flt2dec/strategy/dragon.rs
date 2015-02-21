@@ -70,10 +70,11 @@ fn test_estimate_scaling_factor() {
     }
 }
 
-const POW10: &'static [Digit] = &[1, 10, 100, 1000, 10000, 100000,
-                                  1000000, 10000000, 100000000, 1000000000];
-const TWOPOW10: &'static [Digit] = &[2, 20, 200, 2000, 20000, 200000,
-                                     2000000, 20000000, 200000000, 2000000000];
+// XXX const ref to static array seems to ICE (#22540)
+static POW10: [Digit; 10] = [1, 10, 100, 1000, 10000, 100000,
+                             1000000, 10000000, 100000000, 1000000000];
+static TWOPOW10: [Digit; 10] = [2, 20, 200, 2000, 20000, 200000,
+                                2000000, 20000000, 200000000, 2000000000];
 
 fn mul_pow10(mut x: Big, mut n: usize) -> Big {
     let largest = POW10.len() - 1;
