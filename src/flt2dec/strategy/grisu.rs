@@ -490,8 +490,15 @@ fn shortest_sanity_test() {
     testing::f32_shortest_sanity_test(format_shortest);
 }
 
+#[cfg(test)] #[test]
+fn shortest_random_equivalence_test() {
+    use flt2dec::strategy::dragon::format_shortest as fallback;
+    testing::f64_random_equivalence_test(format_shortest_opt, fallback, 10_000);
+    testing::f32_random_equivalence_test(format_shortest_opt, fallback, 10_000);
+}
+
 #[cfg(test)] #[test] #[ignore] // it is too expensive
-fn shortest_f32_equivalence_test() {
+fn shortest_f32_exhaustive_equivalence_test() {
     // it is hard to directly test the optimality of the output, but we can at least test if
     // two different algorithms agree to each other.
     //
@@ -500,7 +507,15 @@ fn shortest_f32_equivalence_test() {
     // `done, ignored=17643160 passed=2121451879 failed=0`.
 
     use flt2dec::strategy::dragon::format_shortest as fallback;
-    testing::f32_equivalence_test(format_shortest_opt, fallback);
+    testing::f32_exhaustive_equivalence_test(format_shortest_opt, fallback);
+}
+
+#[cfg(test)] #[test] #[ignore] // is is too expensive
+fn shortest_f64_hard_random_equivalence_test() {
+    // this again probably has to use appropriate rustc flags.
+
+    use flt2dec::strategy::dragon::format_shortest as fallback;
+    testing::f64_random_equivalence_test(format_shortest_opt, fallback, 100_000_000);
 }
 
 #[cfg(test)] #[bench]

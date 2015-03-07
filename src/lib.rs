@@ -2,6 +2,7 @@
 #![cfg_attr(test, feature(io, libc, test))] // ditto
 
 #[cfg(test)] extern crate test;
+#[cfg(test)] extern crate rand;
 
 mod num;
 

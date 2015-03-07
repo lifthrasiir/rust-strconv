@@ -62,7 +62,7 @@ fn sanity_test() {
         assert_eq!((n as u32).to_string(), UintToDec(n as u32).to_string());
         assert_eq!((n as u16).to_string(), UintToDec(n as u16).to_string());
         assert_eq!((n as u8).to_string(), UintToDec(n as u8).to_string());
-        n *= 3;
+        n = n.wrapping_mul(3);
     }
 }
 
@@ -77,7 +77,7 @@ macro_rules! make_bench {
                 let mut w = Cursor::new(&mut buf[..]);
                 for _ in range(0, 64) {
                     let _ = write!(&mut w, "{}", n);
-                    n *= 3;
+                    n = n.wrapping_mul(3);
                 }
             });
         }
@@ -91,7 +91,7 @@ macro_rules! make_bench {
                 let mut w = Cursor::new(&mut buf[..]);
                 for _ in range(0, 64) {
                     let _ = write!(&mut w, "{}", UintToDec(n));
-                    n *= 3;
+                    n = n.wrapping_mul(3);
                 }
             });
         }

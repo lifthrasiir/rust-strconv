@@ -3,5 +3,13 @@ name = "strconv"
 version = "0.0.1"
 authors = ["Kang Seonghoon <public+rust@mearie.org>"]
 
+[dev-dependencies]
+rand = "*"
+
+# enable these when you are testing *hard*.
+#[profile.test]
+#opt-level = 3
+#lto = true
+
 [profile.bench]
 lto = true
