@@ -30,7 +30,7 @@ macro_rules! check_exact {
 
         // check significant digits
         for i in range(1, cut.unwrap_or(expected.len() - 1)) {
-            let (len, k) = $fmt(&decoded, buf.slice_to_mut(i));
+            let (len, k) = $fmt(&decoded, &mut buf[..i]);
             assert_eq!(len, i);
 
             bytes::copy_memory(&mut expected_, expected);
@@ -50,7 +50,7 @@ macro_rules! check_exact {
         // check infinite zero digits
         if let Some(cut) = cut {
             for i in range(cut, expected.len() - 1) {
-                let (len, k) = $fmt(&decoded, buf.slice_to_mut(i));
+                let (len, k) = $fmt(&decoded, &mut buf[..i]);
                 assert_eq!(len, cut);
                 assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
                            (str::from_utf8(&expected[..len]).unwrap(), expectedk));

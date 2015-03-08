@@ -84,7 +84,7 @@ macro_rules! define_bignum {
 
                 let mut sz = cmp::max(self.size, other.size);
                 let mut carry = false;
-                for (a, b) in self.base.slice_to_mut(sz).iter_mut().zip(other.base[..sz].iter()) {
+                for (a, b) in self.base[..sz].iter_mut().zip(other.base[..sz].iter()) {
                     let (c, v) = (*a).full_add(*b, carry);
                     *a = v;
                     carry = c;
@@ -103,7 +103,7 @@ macro_rules! define_bignum {
 
                 let sz = cmp::max(self.size, other.size);
                 let mut noborrow = true;
-                for (a, b) in self.base.slice_to_mut(sz).iter_mut().zip(other.base[..sz].iter()) {
+                for (a, b) in self.base[..sz].iter_mut().zip(other.base[..sz].iter()) {
                     let (c, v) = (*a).full_add(!*b, noborrow);
                     *a = v;
                     noborrow = c;
@@ -118,7 +118,7 @@ macro_rules! define_bignum {
 
                 let mut sz = self.size;
                 let mut carry = 0;
-                for a in self.base.slice_to_mut(sz).iter_mut() {
+                for a in self.base[..sz].iter_mut() {
                     let (c, v) = (*a).full_mul(other, carry);
                     *a = v;
                     carry = c;
@@ -178,7 +178,7 @@ macro_rules! define_bignum {
 
                 let sz = self.size;
                 let mut borrow = 0;
-                for a in self.base.slice_to_mut(sz).iter_mut().rev() {
+                for a in self.base[..sz].iter_mut().rev() {
                     let (q, r) = (*a).full_div_rem(other, borrow);
                     *a = q;
                     borrow = r;
