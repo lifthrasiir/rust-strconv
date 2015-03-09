@@ -9,7 +9,7 @@ pub use test::Bencher;
 
 macro_rules! check_shortest {
     ($fmt:ident($v:expr) => $buf:expr, $exp:expr) => ({
-        let mut buf = [0; MAX_SIG_DIGITS];
+        let mut buf = [b'_'; MAX_SIG_DIGITS];
         let (len, k) = $fmt(&decode($v), &mut buf);
         assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
                    (str::from_utf8($buf).unwrap(), $exp));
@@ -22,8 +22,8 @@ macro_rules! check_exact {
         let expectedk = $exp;
 
         // use a large enough buffer
-        let mut buf = [0; 1024];
-        let mut expected_ = [0; 1024];
+        let mut buf = [b'_'; 1024];
+        let mut expected_ = [b'_'; 1024];
 
         let decoded = decode($v);
         let cut = expected.iter().position(|&c| c == b' ');
@@ -33,7 +33,7 @@ macro_rules! check_exact {
             let (len, k) = $fmt(&decoded, &mut buf[..i]);
             assert_eq!(len, i);
 
-            bytes::copy_memory(&mut expected_, expected);
+            bytes::copy_memory(&mut expected_, &expected[..i]);
             let mut expectedk = expectedk;
             if expected[i] >= b'5' {
                 // if this returns true, expected_[..i] is all `9`s and being rounded up.
@@ -43,17 +43,20 @@ macro_rules! check_exact {
                 if round_up(&mut expected_, i) { expectedk += 1; }
             }
 
-            assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
-                       (str::from_utf8(&expected_[..len]).unwrap(), expectedk));
+            assert_eq!((str::from_utf8(&buf[..i]).unwrap(), k),
+                       (str::from_utf8(&expected_[..i]).unwrap(), expectedk));
         }
 
         // check infinite zero digits
         if let Some(cut) = cut {
             for i in range(cut, expected.len() - 1) {
                 let (len, k) = $fmt(&decoded, &mut buf[..i]);
-                assert_eq!(len, cut);
-                assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
-                           (str::from_utf8(&expected[..len]).unwrap(), expectedk));
+                assert_eq!(len, i);
+
+                bytes::copy_memory(&mut expected_, &expected[..cut]);
+                for c in &mut expected_[cut..i] { *c = b'0'; }
+                assert_eq!((str::from_utf8(&buf[..i]).unwrap(), k),
+                           (str::from_utf8(&expected_[..i]).unwrap(), expectedk));
             }
         }
     })
@@ -209,10 +212,12 @@ pub fn f64_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) ->
                                         7538682506419718265533447265625         ", -323);
 }
 
-fn iterate<F, G, V>(func: &str, n: usize, mut f: F, mut g: G, mut v: V) -> (usize, usize)
+fn iterate<F, G, V>(func: &str, k: usize, n: usize, mut f: F, mut g: G, mut v: V) -> (usize, usize)
         where F: FnMut(&Decoded, &mut [u8]) -> Option<(usize, i16)>,
               G: FnMut(&Decoded, &mut [u8]) -> (usize, i16),
               V: FnMut(usize) -> Decoded {
+    assert!(k <= 1024);
+
     let mut npassed = 0; // f(x) = Some(g(x))
     let mut nignored = 0; // f(x) = None
 
@@ -223,10 +228,10 @@ fn iterate<F, G, V>(func: &str, n: usize, mut f: F, mut g: G, mut v: V) -> (usiz
         }
 
         let decoded = v(i);
-        let mut buf1 = [0; MAX_SIG_DIGITS];
-        if let Some((len1, e1)) = f(&decoded, &mut buf1) {
-            let mut buf2 = [0; MAX_SIG_DIGITS];
-            let (len2, e2) = g(&decoded, &mut buf2);
+        let mut buf1 = [0; 1024];
+        if let Some((len1, e1)) = f(&decoded, &mut buf1[..k]) {
+            let mut buf2 = [0; 1024];
+            let (len2, e2) = g(&decoded, &mut buf2[..k]);
             if e1 == e2 && &buf1[..len1] == &buf2[..len2] {
                 npassed += 1;
             } else {
@@ -238,39 +243,39 @@ fn iterate<F, G, V>(func: &str, n: usize, mut f: F, mut g: G, mut v: V) -> (usiz
             nignored += 1;
         }
     }
-    println!("{}: done, ignored={} passed={} failed={}",
-             func, nignored, npassed, n - nignored - npassed);
+    println!("{}({}): done, ignored={} passed={} failed={}",
+             func, k, nignored, npassed, n - nignored - npassed);
     assert!(nignored + npassed == n,
-            "{}: {} out of {} values returns an incorrect value!",
-            func, n - nignored - npassed, n);
+            "{}({}): {} out of {} values returns an incorrect value!",
+            func, k, n - nignored - npassed, n);
     (npassed, nignored)
 }
 
-pub fn f32_random_equivalence_test<F, G>(f: F, g: G, n: usize)
+pub fn f32_random_equivalence_test<F, G>(f: F, g: G, k: usize, n: usize)
         where F: FnMut(&Decoded, &mut [u8]) -> Option<(usize, i16)>,
               G: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     let mut rng = rand::thread_rng();
     let f32_range = Range::new(0x0000_0001u32, 0x7f80_0000);
-    iterate("f32_random_equivalence_test", n, f, g, |_| {
+    iterate("f32_random_equivalence_test", k, n, f, g, |_| {
         let i: u32 = f32_range.ind_sample(&mut rng);
         let x: f32 = unsafe {mem::transmute(i)};
         decode(x)
     });
 }
 
-pub fn f64_random_equivalence_test<F, G>(f: F, g: G, n: usize)
+pub fn f64_random_equivalence_test<F, G>(f: F, g: G, k: usize, n: usize)
         where F: FnMut(&Decoded, &mut [u8]) -> Option<(usize, i16)>,
               G: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     let mut rng = rand::thread_rng();
     let f64_range = Range::new(0x0000_0000_0000_0001u64, 0x7ff0_0000_0000_0000);
-    iterate("f64_random_equivalence_test", n, f, g, |_| {
+    iterate("f64_random_equivalence_test", k, n, f, g, |_| {
         let i: u64 = f64_range.ind_sample(&mut rng);
         let x: f64 = unsafe {mem::transmute(i)};
         decode(x)
     });
 }
 
-pub fn f32_exhaustive_equivalence_test<F, G>(f: F, g: G)
+pub fn f32_exhaustive_equivalence_test<F, G>(f: F, g: G, k: usize)
         where F: FnMut(&Decoded, &mut [u8]) -> Option<(usize, i16)>,
               G: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     // we have only 2^23 * (2^8 - 1) - 1 = 2,139,095,039 positive finite f32 values,
@@ -281,7 +286,7 @@ pub fn f32_exhaustive_equivalence_test<F, G>(f: F, g: G)
 
     // iterate from 0x0000_0001 to 0x7f7f_ffff, i.e. all finite ranges
     let (npassed, nignored) = iterate("f32_exhaustive_equivalence_test",
-                                      0x7f7f_ffff, f, g, |i: usize| {
+                                      k, 0x7f7f_ffff, f, g, |i: usize| {
         let x: f32 = unsafe {mem::transmute(i as u32 + 1)};
         decode(x)
     });

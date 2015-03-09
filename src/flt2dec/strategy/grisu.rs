@@ -9,7 +9,7 @@ Rust adaptation of Grisu3 algorithm described in [1]. It uses about
 use std::num::{Int, Float};
 #[cfg(test)] use test;
 
-use flt2dec::{Decoded, MAX_SIG_DIGITS};
+use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 #[cfg(test)] use flt2dec::testing;
 
 #[derive(Copy, Debug)]
@@ -51,6 +51,10 @@ impl Fp {
         Fp { f: self.f << edelta, e: e }
     }
 }
+
+// see the comments in `format_shortest_opt` for the rationale.
+const ALPHA: i16 = -60;
+const GAMMA: i16 = -32;
 
 /*
 # the following Python code generates this table:
@@ -164,11 +168,9 @@ fn test_cached_power() {
     assert_eq!(CACHED_POW10.first().unwrap().1, CACHED_POW10_FIRST_E);
     assert_eq!(CACHED_POW10.last().unwrap().1, CACHED_POW10_LAST_E);
 
-    let alpha = -60;
-    let gamma = -32;
     for e in range(-1137, 961) { // full range for f64
-        let low = alpha - e - 64;
-        let high = gamma - e - 64;
+        let low = ALPHA - e - 64;
+        let high = GAMMA - e - 64;
         let (_k, cached) = cached_power(low, high);
         assert!(low <= cached.e && cached.e <= high,
                 "cached_power({}, {}) = {:?} is incorrect", low, high, cached);
@@ -225,11 +227,11 @@ pub fn format_shortest_opt(d: &Decoded,
     let minus = Fp { f: d.mant - d.minus, e: d.exp }.normalize_to(plus.e);
     let v = Fp { f: d.mant, e: d.exp }.normalize_to(plus.e);
 
-    // find any `cached = 10^minusk` such that `alpha <= minusk + plus.e + 64 <= gamma`.
-    // since `plus` is normalized, this means `2^(62 + alpha) <= plus * cached < 2^(64 + gamma)`;
-    // given our choices of `alpha` and `gamma`, this puts `plus * cached` into `[4, 2^32)`.
+    // find any `cached = 10^minusk` such that `ALPHA <= minusk + plus.e + 64 <= GAMMA`.
+    // since `plus` is normalized, this means `2^(62 + ALPHA) <= plus * cached < 2^(64 + GAMMA)`;
+    // given our choices of `ALPHA` and `GAMMA`, this puts `plus * cached` into `[4, 2^32)`.
     //
-    // it is obviously desirable to maximize `gamma - alpha`,
+    // it is obviously desirable to maximize `GAMMA - ALPHA`,
     // so that we don't need many cached powers of 10, but there are some considerations:
     //
     // 1. we want to keep `floor(plus * cached)` within `u32` since it needs a costly division.
@@ -237,13 +239,11 @@ pub fn format_shortest_opt(d: &Decoded,
     // 2. the remainder of `floor(plus * cached)` repeatedly gets multiplied by 10,
     //    and it should not overflow.
     // 
-    // the first gives `64 + gamma <= 32`, while the second gives `10 * 2^-alpha <= 2^64`;
+    // the first gives `64 + GAMMA <= 32`, while the second gives `10 * 2^-ALPHA <= 2^64`;
     // -60 and -32 is the maximal range with this constraint, and V8 also uses them.
-    let alpha = -60;
-    let gamma = -32;
-    let (minusk, cached) = cached_power(alpha - plus.e - 64, gamma - plus.e - 64);
+    let (minusk, cached) = cached_power(ALPHA - plus.e - 64, GAMMA - plus.e - 64);
 
-    // scale fps.
+    // scale fps. this gives the maximal error of 1 ulp (proved from Theorem 5.1).
     let plus = plus.mul(&cached);
     let minus = minus.mul(&cached);
     let v = v.mul(&cached);
@@ -261,9 +261,9 @@ pub fn format_shortest_opt(d: &Decoded,
     //   |   minus   |                 |     v     |                 |   plus    |
     // minus1     minus0           v - 1 ulp   v + 1 ulp           plus0       plus1
     //
-    // above `minus`, `v` and `plus` are *quantized* approximations (error <= 0.5 ulp).
+    // above `minus`, `v` and `plus` are *quantized* approximations (error < 1 ulp).
     // as we don't know the error is positive or negative, we use two approximations spaced equally
-    // and have the maximal error of 1.5 ulps; the combined error will be exactly 2 ulps.
+    // and have the maximal error of 2 ulps.
     //
     // the "unsafe region" is a liberal interval which we initially generate.
     // the "safe region" is a conservative interval which we only accept.
@@ -317,7 +317,7 @@ pub fn format_shortest_opt(d: &Decoded,
         buf[i] = b'0' + q as u8;
         i += 1;
 
-        let plus1rem = ((r as u64) << e) + plus1frac; // == plus1 % (10^kappa * 2^e)
+        let plus1rem = ((r as u64) << e) + plus1frac; // == (plus1 % 10^kappa) * 2^e
         if plus1rem < delta1 {
             // `plus1 % 10^kappa < delta1 = plus1 - minus1`; we've found the correct `kappa`.
             let ten_kappa = (ten_kappa as u64) << e; // scale 10^kappa back to the shared exponent
@@ -484,6 +484,228 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     }
 }
 
+pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usize, /*exp*/ i16)> {
+    assert!(d.mant > 0);
+    assert!(d.mant < (1 << 61)); // we need at least three bits of additional precision
+    assert!(!buf.is_empty());
+
+    // normalize and scale `v`.
+    let v = Fp { f: d.mant, e: d.exp }.normalize();
+    let (minusk, cached) = cached_power(ALPHA - v.e - 64, GAMMA - v.e - 64);
+    let v = v.mul(&cached);
+
+    // divide `v` into integral and fractional parts.
+    let e = -v.e as usize;
+    let vint = (v.f >> e) as u32;
+    let vfrac = v.f & ((1 << e) - 1);
+
+    // both old `v` and new `v` (scaled by `10^-k`) has an error of < 1 ulp (Theorem 5.1).
+    // as we don't know the error is positive or negative, we use two approximations
+    // spaced equally and have the maximal error of 2 ulps (same to the shortest case).
+    //
+    // the goal is to find the exactly rounded series of digits that are common to
+    // both `v - 1 ulp` and `v + 1 ulp`, so that we are maximally confident.
+    // if this is not possible, we don't know which one is the correct output for `v`,
+    // so we give up and fall back.
+    //
+    // `err` is defined as `1 ulp * 2^e` here (same to the ulp in `vfrac`),
+    // and we will scale it whenever `v` gets scaled.
+    let mut err = 1;
+
+    // calculate the largest `10^max_kappa` no more than `v` (thus `v < 10^(max_kappa+1)`).
+    // this is an upper bound of `kappa` below.
+    let (max_kappa, max_ten_kappa) = max_pow10_no_more_than(vint);
+
+    let mut i = 0;
+    let exp = max_kappa as i16 - minusk + 1;
+
+    // render integral parts.
+    // the error is entirely fractional, so we don't need to check it in this part.
+    let mut kappa = max_kappa as i16;
+    let mut ten_kappa = max_ten_kappa; // 10^kappa
+    let mut remainder = vint; // digits yet to be rendered
+    loop { // we always have at least one digit to render
+        // invariants:
+        // - `remainder < 10^(kappa+1)`
+        // - `vint = d[0..n-1] * 10^(kappa+1) + remainder`
+        //   (it follows that `remainder = vint % 10^(kappa+1)`)
+
+        // divide `remainder` by `10^kappa`. both are scaled by `2^-e`.
+        let q = remainder / ten_kappa;
+        let r = remainder % ten_kappa;
+        debug_assert!(q < 10);
+        buf[i] = b'0' + q as u8;
+        i += 1;
+
+        // is the buffer full? run the rounding pass with the remainder.
+        if i == buf.len() {
+            let vrem = ((r as u64) << e) + vfrac; // == (v % 10^kappa) * 2^e
+            return possibly_round(&mut buf[..i], exp, vrem, (ten_kappa as u64) << e, err << e);
+        }
+
+        // break the loop when we have rendered all integral digits.
+        // the exact number of digits is `max_kappa + 1` as `plus1 < 10^(max_kappa+1)`.
+        if i > max_kappa as usize {
+            debug_assert_eq!(ten_kappa, 1);
+            debug_assert_eq!(kappa, 0);
+            break;
+        }
+
+        // restore invariants
+        kappa -= 1;
+        ten_kappa /= 10;
+        remainder = r;
+    }
+
+    // render fractional parts.
+    //
+    // in principle we can continue to the last available digit and check for the accuracy.
+    // unfortunately we are working with the finite-sized integers, so we need some criterion
+    // to detect the overflow. V8 uses `remainder > err`, which becomes false when
+    // the first `i` significant digits of `v - 1 ulp` and `v` differ. however this rejects
+    // too many otherwise valid input.
+    //
+    // since the later phase has a correct overflow detection, we instead use tighter criterion:
+    // we continue til `err` exceeds `10^kappa / 2`, so that the range between `v - 1 ulp` and
+    // `v + 1 ulp` definitely contains two or more rounded representations. this is same to
+    // the first two comparisons from `possibly_round`, for the reference.
+    let mut remainder = vfrac;
+    let maxerr = 1 << (e - 1);
+    while err < maxerr {
+        // invariants, where `m = max_kappa + 1` (# of digits in the integral part):
+        // - `remainder < 2^e`
+        // - `vfrac * 10^(n-m) = d[m..n-1] * 2^e + remainder`
+        // - `err = 10^(n-m)`
+
+        remainder *= 10; // won't overflow, `2^e * 10 < 2^64`
+        err *= 10; // won't overflow, `err * 10 < 2^60 * 10 < 2^64`
+
+        // divide `remainder` by `10^kappa`.
+        // both are scaled by `2^e / 10^kappa`, so the latter is implicit here.
+        let q = remainder >> e;
+        let r = remainder & ((1 << e) - 1);
+        debug_assert!(q < 10);
+        buf[i] = b'0' + q as u8;
+        i += 1;
+
+        // is the buffer full? run the rounding pass with the remainder.
+        if i == buf.len() {
+            return possibly_round(&mut buf[..i], exp, r, 1 << e, err);
+        }
+
+        // restore invariants
+        remainder = r;
+    }
+
+    // further calculation can overflow, so we give up.
+    return None;
+
+    // we've generated all requested digits of `v`, which should be also same to corresponding
+    // digits of `v - 1 ulp`. now we check if there is a unique representation shared by
+    // both `v - 1 ulp` and `v + 1 ulp`; this can be either same to generated digits, or
+    // to the rounded-up version of those digits. if the range contains multiple representations
+    // of the same length, we cannot be sure and should return `None` instead.
+    //
+    // all arguments here are scaled by the common (but implicit) value `k`, so that:
+    // - `remainder = (v % 10^kappa) * k`
+    // - `ten_kappa = 10^kappa * k`
+    // - `ulp = 2^-e * k`
+    fn possibly_round(buf: &mut [u8], mut exp: i16, remainder: u64, ten_kappa: u64,
+                      ulp: u64) -> Option<(usize, i16)> {
+        debug_assert!(remainder < ten_kappa);
+
+        //           10^kappa
+        //    :   :   :<->:   :
+        //    :   :   :   :   :
+        //    :|1 ulp|1 ulp|  :
+        //    :|<--->|<--->|  :
+        // ----|-----|-----|----
+        //     |     v     |
+        // v - 1 ulp   v + 1 ulp
+        //
+        // (for the reference, the dotted line indicates the exact value for
+        // possible representations in given number of digits.)
+        //
+        // error is too large that there are at least three possible representations
+        // between `v - 1 ulp` and `v + 1 ulp`. we cannot determine which one is correct.
+        if ulp >= ten_kappa { return None; }
+
+        //    10^kappa
+        //   :<------->:
+        //   :         :
+        //   : |1 ulp|1 ulp|
+        //   : |<--->|<--->|
+        // ----|-----|-----|----
+        //     |     v     |
+        // v - 1 ulp   v + 1 ulp
+        //
+        // in fact, 1/2 ulp is enough to introduce two possible representations.
+        // (remember that we need a unique representation for both `v - 1 ulp` and `v + 1 ulp`.)
+        // this won't overflow, as `ulp < ten_kappa` from the first check.
+        if ten_kappa - ulp <= ulp { return None; }
+
+        //     remainder
+        //       :<->|                           :
+        //       :   |                           :
+        //       :<--------- 10^kappa ---------->:
+        //     | :   |                           :
+        //     |1 ulp|1 ulp|                     :
+        //     |<--->|<--->|                     :
+        // ----|-----|-----|------------------------
+        //     |     v     |
+        // v - 1 ulp   v + 1 ulp
+        //
+        // if `v + 1 ulp` is closer to the rounded-down representation (which is already in `buf`),
+        // then we can safely return. note that `v - 1 ulp` *can* be less than the current
+        // representation, but as `1 ulp < 10^kappa / 2`, this condition is enough:
+        // the distance between `v - 1 ulp` and the current representation
+        // cannot exceed `10^kappa / 2`.
+        //
+        // the condition equals to `remainder + ulp < 10^kappa / 2`.
+        // since this can easily overflow, first check if `remainder < 10^kappa / 2`.
+        // we've already verified that `ulp < 10^kappa / 2`, so as long as
+        // `10^kappa` did not overflow after all, the second check is fine.
+        if ten_kappa - remainder > remainder && ten_kappa - 2 * remainder >= 2 * ulp {
+            return Some((buf.len(), exp));
+        }
+
+        //   :<------- remainder ------>|   :
+        //   :                          |   :
+        //   :<--------- 10^kappa --------->:
+        //   :                    |     |   : |
+        //   :                    |1 ulp|1 ulp|
+        //   :                    |<--->|<--->|
+        // -----------------------|-----|-----|-----
+        //                        |     v     |
+        //                    v - 1 ulp   v + 1 ulp
+        //
+        // on the other hands, if `v - 1 ulp` is closer to the rounded-up representation,
+        // we should round up and return. for the same reason we don't need to check `v + 1 ulp`.
+        //
+        // the condition equals to `remainder - ulp >= 10^kappa / 2`.
+        // again we first check if `remainder > ulp` (note that this is not `remainder >= ulp`,
+        // as `10^kappa` is never zero). also note that `remainder - ulp <= 10^kappa`,
+        // so the second check does not overflow.
+        if remainder > ulp && ten_kappa - (remainder - ulp) <= remainder - ulp {
+            let len = buf.len();
+            if round_up(buf, len) { exp += 1; }
+            return Some((buf.len(), exp));
+        }
+
+        // otherwise we are doomed (i.e. some values between `v - 1 ulp` and `v + 1 ulp` are
+        // rounding down and others are rounding up) and give up.
+        None
+    }
+}
+
+pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ i16) {
+    use flt2dec::strategy::dragon::format_exact as fallback;
+    match format_exact_opt(d, buf) {
+        Some(ret) => ret,
+        None => fallback(d, buf),
+    }
+}
+
 #[cfg(test)] #[test]
 fn shortest_sanity_test() {
     testing::f64_shortest_sanity_test(format_shortest);
@@ -493,8 +715,8 @@ fn shortest_sanity_test() {
 #[cfg(test)] #[test]
 fn shortest_random_equivalence_test() {
     use flt2dec::strategy::dragon::format_shortest as fallback;
-    testing::f64_random_equivalence_test(format_shortest_opt, fallback, 10_000);
-    testing::f32_random_equivalence_test(format_shortest_opt, fallback, 10_000);
+    testing::f64_random_equivalence_test(format_shortest_opt, fallback, MAX_SIG_DIGITS, 10_000);
+    testing::f32_random_equivalence_test(format_shortest_opt, fallback, MAX_SIG_DIGITS, 10_000);
 }
 
 #[cfg(test)] #[test] #[ignore] // it is too expensive
@@ -507,7 +729,7 @@ fn shortest_f32_exhaustive_equivalence_test() {
     // `done, ignored=17643160 passed=2121451879 failed=0`.
 
     use flt2dec::strategy::dragon::format_shortest as fallback;
-    testing::f32_exhaustive_equivalence_test(format_shortest_opt, fallback);
+    testing::f32_exhaustive_equivalence_test(format_shortest_opt, fallback, MAX_SIG_DIGITS);
 }
 
 #[cfg(test)] #[test] #[ignore] // is is too expensive
@@ -515,14 +737,38 @@ fn shortest_f64_hard_random_equivalence_test() {
     // this again probably has to use appropriate rustc flags.
 
     use flt2dec::strategy::dragon::format_shortest as fallback;
-    testing::f64_random_equivalence_test(format_shortest_opt, fallback, 100_000_000);
+    testing::f64_random_equivalence_test(format_shortest_opt, fallback,
+                                         MAX_SIG_DIGITS, 100_000_000);
+}
+
+#[cfg(test)] #[test]
+fn exact_sanity_test() {
+    testing::f64_exact_sanity_test(format_exact);
+    testing::f32_exact_sanity_test(format_exact);
+}
+
+#[cfg(test)] #[test]
+fn exact_f32_random_equivalence_test() {
+    use flt2dec::strategy::dragon::format_exact as fallback;
+    for k in 1..21 {
+        testing::f32_random_equivalence_test(format_exact_opt, fallback, k, 1_000);
+    }
+}
+
+#[cfg(test)] #[test]
+fn exact_f64_random_equivalence_test() {
+    use flt2dec::strategy::dragon::format_exact as fallback;
+    for k in 1..21 {
+        testing::f64_random_equivalence_test(format_exact_opt, fallback, k, 1_000);
+    }
 }
 
 #[cfg(test)] #[bench]
 fn bench_small_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
-    b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
+    let mut buf = [0; MAX_SIG_DIGITS];
+    b.iter(|| format_shortest(&decoded, &mut buf));
 }
 
 #[cfg(test)] #[bench]
@@ -530,6 +776,41 @@ fn bench_big_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
     let v: f64 = Float::max_value();
     let decoded = decode(v);
-    b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
+    let mut buf = [0; MAX_SIG_DIGITS];
+    b.iter(|| format_shortest(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_small_exact_3(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let decoded = decode(3.141592f64);
+    let mut buf = [0; 3];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_big_exact_3(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let v: f64 = Float::max_value();
+    let decoded = decode(v);
+    let mut buf = [0; 3];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_small_exact_inf(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let decoded = decode(3.141592f64);
+    let mut buf = [0; 1024];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_big_exact_inf(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let v: f64 = Float::max_value();
+    let decoded = decode(v);
+    let mut buf = [0; 1024];
+    b.iter(|| format_exact(&decoded, &mut buf));
 }
 

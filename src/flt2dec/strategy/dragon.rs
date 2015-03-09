@@ -257,6 +257,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     if up && (!down || mant.mul_pow2(1) >= scale) {
         // if rounding up changes the length, the exponent should also change
         if round_up(buf, i) {
+            buf[i] = b'0';
             i += 1;
             k += 1;
         }
@@ -312,7 +313,9 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ 
     let len = buf.len();
     for i in range(0, len) {
         if mant.is_zero() { // following digits are all zeroes, we stop here
-            return (i, k); // do *not* try to perform rounding!
+            // do *not* try to perform rounding! rather, fill remaining digits.
+            for c in &mut buf[i..len] { *c = b'0'; }
+            return (len, k);
         }
 
         let mut d = 0;
@@ -328,7 +331,11 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ 
 
     // rounding up if we stop in the middle of digits
     if mant >= scale.mul_small(5) {
-        assert!(!round_up(buf, len));
+        // if rounding up changes the length, the exponent should also change
+        // (but we've been requested a fixed number of digits, so do not alter the buffer)
+        if round_up(buf, len) {
+            k += 1;
+        }
     }
 
     (buf.len(), k)
@@ -350,7 +357,8 @@ fn exact_sanity_test() {
 fn bench_small_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
-    b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
+    let mut buf = [0; MAX_SIG_DIGITS];
+    b.iter(|| format_shortest(&decoded, &mut buf));
 }
 
 #[cfg(test)] #[bench]
@@ -358,7 +366,8 @@ fn bench_big_shortest(b: &mut test::Bencher) {
     use flt2dec::decode;
     let v: f64 = Float::max_value();
     let decoded = decode(v);
-    b.iter(|| { let mut buf = [0; MAX_SIG_DIGITS]; format_shortest(&decoded, &mut buf) });
+    let mut buf = [0; MAX_SIG_DIGITS];
+    b.iter(|| format_shortest(&decoded, &mut buf));
 }
 
 #[cfg(test)] #[bench]

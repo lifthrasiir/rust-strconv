@@ -106,14 +106,11 @@ There are several strategies available:
   and re-refined by Burger and Dybvig (the refinement itself was known but only described later).
   Requires a quite bit of stack (max 2KB), and may pose a problem with constrained environments.
   (Status: Implemented. Roughly tested.)
-* `grisu_inexact` implements the Grisu2 algorithm described by Florian Loitsch.
-  This *is* inexact, but is very fast and can be used as a replacement to `dragon`.
-  Uses about 1KB of precomputed table. (Status: I have a code but yet to integrate to strconv.)
-* `grisu` implements the Grisu3 algorithm, which is a conditional algorithm similar to Grisu2.
+* `grisu` implements the Grisu3 algorithm described by Florian Loitsch.
   This returns either a formatted number or an error, in which case the caller should fall back.
   Both case is very fast so it is best to use with `dragon`. Shares the same precomputed table
-  as `grisu_inexact`. (Status: Implemented, exact pending. Tested exhaustively for f32,
-  roughly for f64.)
+  as `grisu_inexact`. (Status: Implemented. Shortest case is tested exhaustively for f32,
+  roughly for other cases.)
 * `system` is a dummy strategy for the comparison; it is Rust's built-in string conversion.
   This incurs the allocation (there is no way to avoid that), and it produces an inexact result.
 * `libc` is a dummy strategy for the comparison; it is C's `snprintf`.
@@ -126,12 +123,24 @@ We use 6 different benchmarks to see the rough performance characteristics of ea
 * `*_exact_inf` tests an "exact" mode with the large enough buffer that any correct strategy will
   produce all significant digits. (To be exact, we are using 1KB buffer.)
 
+Some notes:
+
+* While `grisu` is very fast, `*_exact_inf` tests are known to be the worst case of `grisu`;
+  it *should* fall back to `dragon` strategy unconditionally. This explains seemingly worse
+  performance of the corresponding test.
+* Most major `libc` implementations use some sort of accurate printing algorithm, but details vary.
+  Glibc uses a Dragon-like algorithm with GMP and prints every requested digit.
+  Msvcrt, on the other hands, has an unspecified (but probably Dragon-like) algorithm but
+  only prints the shortest representation when the large number of digits are requested:
+  for example, `printf("%.30lf", 0.1)` would print `0.100000000000000000000000000000` instead of
+  the exactly rounded value (`0.100000000000000005551115123126`).
+
 Results from the slow laptop:
 
 Strategy | `big_exact_3` | `big_exact_inf` | `big_shortest` | `small_exact_3` | `small_exact_inf` | `small_shortest`
 ---------|---------------|-----------------|----------------|-----------------|-------------------|-----------------
-`dragon` | 4785 (100) | **134363 (1443)** | 14658 (403) | 864 (14) | 9657 (89) | 2216 (20)
-`grisu` | N/A | N/A | **209 (3)** | N/A | N/A | **132 (0)**
-`libc` | 1380 (17) | N/A | N/A | **313 (2)** | N/A | N/A
-`system` | **747 (5)** | 290187 (2558) | N/A | 500 (16) | **328 (3)** | N/A
+`dragon` | 4769 (14) | **130583 (463)** | 15043 (57) | 793 (8) | 10105 (35) | 2187 (8)
+`grisu` | **80 (3)** | **130463 (217)** | **202 (0)** | **72 (0)** | 9843 (34) | **132 (1)**
+`libc` | 1364 (6) | N/A | N/A | 302 (3) | N/A | N/A
+`system` | 733 (5) | 289881 (1117) | N/A | 466 (6) | **283 (1)** | N/A
 
