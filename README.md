@@ -120,6 +120,7 @@ We use 6 different benchmarks to see the rough performance characteristics of ea
 * `small_*` prints `3.141592f64`, `big_*` prints the maximum value for `f64` (~= `1.8 * 10^308`).
 * `*_shortest` tests a "shortest" mode.
 * `*_exact_3` tests an "exact" mode with the buffer of 3 significant digits.
+* `*_exact_12` tests an "exact" mode with the buffer of 12 significant digits.
 * `*_exact_inf` tests an "exact" mode with the large enough buffer that any correct strategy will
   produce all significant digits. (To be exact, we are using 1KB buffer.)
 
@@ -134,6 +135,15 @@ Some notes:
   only prints the shortest representation when the large number of digits are requested:
   for example, `printf("%.30lf", 0.1)` would print `0.100000000000000000000000000000` instead of
   the exactly rounded value (`0.100000000000000005551115123126`).
+
+Results from the slow laptop:
+
+Strategy | `big_exact_3` | `big_exact_12` | `big_exact_inf` | `big_shortest` | `small_exact_3` | `small_exact_12` | `small_exact_inf` | `small_shortest`
+---------|---------------|----------------|-----------------|----------------|-----------------|------------------|-------------------|-----------------
+`dragon` | 4728 (52) | 8070 (54) | **128681 (177)** | 14827 (137) | 803 (5) | 1571 (26) | **9632 (30)** | 2077 (19)
+`grisu` | **73 (1)** | **150 (0)** | **130724 (197)** | **197 (1)** | **67 (0)** | **109 (1)** | **9908 (43)** | **124 (0)**
+`libc` | 1364 (5) | N/A | N/A | N/A | 302 (5) | N/A | N/A | N/A
+`system` | 734 (2) | N/A | 290002 (2639) | N/A | 470 (1) | N/A | 282 (1) | N/A
 
 Results from the moderate desktop, 64-bit:
 
