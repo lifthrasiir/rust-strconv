@@ -388,6 +388,23 @@ fn bench_big_exact_3(b: &mut test::Bencher) {
 }
 
 #[cfg(test)] #[bench]
+fn bench_small_exact_12(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let decoded = decode(3.141592f64);
+    let mut buf = [0; 12];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_big_exact_12(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let v: f64 = Float::max_value();
+    let decoded = decode(v);
+    let mut buf = [0; 12];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
 fn bench_small_exact_inf(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);

@@ -35,11 +35,13 @@ impl Fp {
     fn normalize(&self) -> Fp {
         let mut f = self.f;
         let mut e = self.e;
-        let min = 1 << 63;
-        while f < min {
-            f <<= 1;
-            e -= 1;
-        }
+        if f >> (64 - 32) == 0 { f <<= 32; e -= 32; }
+        if f >> (64 - 16) == 0 { f <<= 16; e -= 16; }
+        if f >> (64 -  8) == 0 { f <<=  8; e -=  8; }
+        if f >> (64 -  4) == 0 { f <<=  4; e -=  4; }
+        if f >> (64 -  2) == 0 { f <<=  2; e -=  2; }
+        if f >> (64 -  1) == 0 { f <<=  1; e -=  1; }
+        debug_assert!(f >= (1 >> 63));
         Fp { f: f, e: e }
     }
 
@@ -578,7 +580,7 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
         // - `err = 10^(n-m)`
 
         remainder *= 10; // won't overflow, `2^e * 10 < 2^64`
-        err *= 10; // won't overflow, `err * 10 < 2^60 * 10 < 2^64`
+        err *= 10; // won't overflow, `err * 10 < 2^e * 5 < 2^64`
 
         // divide `remainder` by `10^kappa`.
         // both are scaled by `2^e / 10^kappa`, so the latter is implicit here.
@@ -597,7 +599,7 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
         remainder = r;
     }
 
-    // further calculation can overflow, so we give up.
+    // further calculation is useless (`possibly_round` definitely fails), so we give up.
     return None;
 
     // we've generated all requested digits of `v`, which should be also same to corresponding
@@ -794,6 +796,23 @@ fn bench_big_exact_3(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     let mut buf = [0; 3];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_small_exact_12(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let decoded = decode(3.141592f64);
+    let mut buf = [0; 12];
+    b.iter(|| format_exact(&decoded, &mut buf));
+}
+
+#[cfg(test)] #[bench]
+fn bench_big_exact_12(b: &mut test::Bencher) {
+    use flt2dec::decode;
+    let v: f64 = Float::max_value();
+    let decoded = decode(v);
+    let mut buf = [0; 12];
     b.iter(|| format_exact(&decoded, &mut buf));
 }
 
