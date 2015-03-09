@@ -108,9 +108,8 @@ There are several strategies available:
   (Status: Implemented. Roughly tested.)
 * `grisu` implements the Grisu3 algorithm described by Florian Loitsch.
   This returns either a formatted number or an error, in which case the caller should fall back.
-  Both case is very fast so it is best to use with `dragon`. Shares the same precomputed table
-  as `grisu_inexact`. (Status: Implemented. Shortest case is tested exhaustively for f32,
-  roughly for other cases.)
+  Both case is very fast so it is best to use with `dragon`. Uses about 1KB of precomputed table.
+  (Status: Implemented. f32 shortest is tested exhaustively for f32, others are roughly tested.)
 * `system` is a dummy strategy for the comparison; it is Rust's built-in string conversion.
   This incurs the allocation (there is no way to avoid that), and it produces an inexact result.
 * `libc` is a dummy strategy for the comparison; it is C's `snprintf`.
