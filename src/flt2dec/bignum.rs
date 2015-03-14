@@ -243,7 +243,7 @@ mod tests {
     define_bignum!(Big: type=u8, n=3);
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_from_u64_overflow() {
         Big::from_u64(0x1000000);
     }
@@ -259,13 +259,13 @@ mod tests {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_add_overflow_1() {
         Big::from_small(1).add(&Big::from_u64(0xffffff));
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_add_overflow_2() {
         Big::from_u64(0xffffff).add(&Big::from_small(1));
     }
@@ -280,13 +280,13 @@ mod tests {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_sub_underflow_1() {
         Big::from_u64(0x10665).sub(&Big::from_u64(0x10666));
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_sub_underflow_2() {
         Big::from_small(0).sub(&Big::from_u64(0x123456));
     }
@@ -299,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_mul_small_overflow() {
         Big::from_u64(0x800000).mul_small(2);
     }
@@ -317,13 +317,13 @@ mod tests {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_mul_pow2_overflow_1() {
         Big::from_u64(0x1).mul_pow2(24);
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_mul_pow2_overflow_2() {
         Big::from_u64(0x123).mul_pow2(16);
     }
