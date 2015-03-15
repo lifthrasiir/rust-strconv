@@ -255,7 +255,9 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     // i) only the rounding-up condition was triggered, or
     // ii) both conditions were triggered and tie breaking prefers rounding up.
     if up && (!down || mant.mul_pow2(1) >= scale) {
-        // if rounding up changes the length, the exponent should also change
+        // if rounding up changes the length, the exponent should also change.
+        // note this condition is actually overflow (would set `buf[buf.len()]` if true),
+        // but we are just being consistent.
         if round_up(buf, i) {
             buf[i] = b'0';
             i += 1;
@@ -345,6 +347,7 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ 
 fn shortest_sanity_test() {
     testing::f64_shortest_sanity_test(format_shortest);
     testing::f32_shortest_sanity_test(format_shortest);
+    testing::more_shortest_sanity_test(format_shortest);
 }
 
 #[cfg(test)] #[test]

@@ -712,6 +712,7 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ 
 fn shortest_sanity_test() {
     testing::f64_shortest_sanity_test(format_shortest);
     testing::f32_shortest_sanity_test(format_shortest);
+    testing::more_shortest_sanity_test(format_shortest);
 }
 
 #[cfg(test)] #[test]

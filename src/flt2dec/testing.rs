@@ -13,6 +13,13 @@ macro_rules! check_shortest {
         let (len, k) = $fmt(&decode($v), &mut buf);
         assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
                    (str::from_utf8($buf).unwrap(), $exp));
+    });
+
+    ($fmt:ident{$($k:ident: $v:expr),+} => $buf:expr, $exp:expr) => ({
+        let mut buf = [b'_'; MAX_SIG_DIGITS];
+        let (len, k) = $fmt(&Decoded { $($k: $v),+ }, &mut buf);
+        assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
+                   (str::from_utf8($buf).unwrap(), $exp));
     })
 }
 
@@ -308,6 +315,13 @@ pub fn f64_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) ->
     check_exact_one!(f(8797576579012143.0,   588; f64) => b"89125197712484551899",    193);
     check_exact_one!(f(7363326733505337.0,   272; f64) => b"558769757362301140950",    98);
     check_exact_one!(f(8549497411294502.0,  -448; f64) => b"1176257830728540379990", -118);
+}
+
+pub fn more_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+    check_shortest!(f{mant: 99_999_999_999_999_999, minus: 1, plus: 1,
+                      exp: 0, sign: 1, inclusive: true} => b"1", 18);
+    check_shortest!(f{mant: 99_999_999_999_999_999, minus: 1, plus: 1,
+                      exp: 0, sign: 1, inclusive: false} => b"99999999999999999", 17);
 }
 
 fn iterate<F, G, V>(func: &str, k: usize, n: usize, mut f: F, mut g: G, mut v: V) -> (usize, usize)
