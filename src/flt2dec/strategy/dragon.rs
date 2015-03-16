@@ -76,15 +76,26 @@ static POW10: [Digit; 10] = [1, 10, 100, 1000, 10000, 100000,
 static TWOPOW10: [Digit; 10] = [2, 20, 200, 2000, 20000, 200000,
                                 2000000, 20000000, 200000000, 2000000000];
 
-fn mul_pow10(mut x: Big, mut n: usize) -> Big {
-    let largest = POW10.len() - 1;
-    while n > largest {
-        x = x.mul_small(POW10[largest]);
-        n -= largest;
-    }
-    if n > 0 {
-        x = x.mul_small(POW10[n]);
-    }
+// precalculated arrays of `Digit`s for 10^(2^n)
+static POW10TO16: [Digit; 2] = [0x6fc10000, 0x2386f2];
+static POW10TO32: [Digit; 4] = [0, 0x85acef81, 0x2d6d415b, 0x4ee];
+static POW10TO64: [Digit; 7] = [0, 0, 0xbf6a1f01, 0x6e38ed64, 0xdaa797ed, 0xe93ff9f4, 0x184f03];
+static POW10TO128: [Digit; 14] =
+    [0, 0, 0, 0, 0x2e953e01, 0x3df9909, 0xf1538fd, 0x2374e42f, 0xd3cff5ec, 0xc404dc08,
+     0xbccdb0da, 0xa6337f19, 0xe91f2603, 0x24e];
+static POW10TO256: [Digit; 27] =
+    [0, 0, 0, 0, 0, 0, 0, 0, 0x982e7c01, 0xbed3875b, 0xd8d99f72, 0x12152f87, 0x6bde50c6,
+     0xcf4a6e70, 0xd595d80f, 0x26b2716e, 0xadc666b0, 0x1d153624, 0x3c42d35a, 0x63ff540e,
+     0xcc5573c0, 0x65f9ef17, 0x55bc28f2, 0x80dcc7f7, 0xf46eeddc, 0x5fdcefce, 0x553f7];
+
+fn mul_pow10(mut x: Big, n: usize) -> Big {
+    if n &   7 != 0 { x = x.mul_small(POW10[n & 7]); }
+    if n &   8 != 0 { x = x.mul_small(POW10[8]); }
+    if n &  16 != 0 { x = x.mul_digits(&POW10TO16); }
+    if n &  32 != 0 { x = x.mul_digits(&POW10TO32); }
+    if n &  64 != 0 { x = x.mul_digits(&POW10TO64); }
+    if n & 128 != 0 { x = x.mul_digits(&POW10TO128); }
+    if n & 256 != 0 { x = x.mul_digits(&POW10TO256); }
     x
 }
 
@@ -100,7 +111,7 @@ fn div_2pow10(mut x: Big, mut n: usize) -> Big {
 #[cfg(test)] #[test]
 fn test_mul_pow10() {
     let mut prevpow10 = Big::from_small(1);
-    for i in range(1, 20) {
+    for i in range(1, 340) {
         let curpow10 = mul_pow10(Big::from_small(1), i);
         assert_eq!(curpow10, prevpow10.mul_small(10));
         prevpow10 = curpow10;

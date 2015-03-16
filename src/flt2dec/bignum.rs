@@ -4,6 +4,7 @@ use super::intrin;
 pub trait FullOps {
     fn full_add(self, other: Self, carry: bool) -> (bool /*carry*/, Self);
     fn full_mul(self, other: Self, carry: Self) -> (Self /*carry*/, Self);
+    fn full_mul_add(self, other: Self, other2: Self, carry: Self) -> (Self /*carry*/, Self);
     fn full_div_rem(self, other: Self, borrow: Self) -> (Self /*quotient*/, Self /*remainder*/);
 }
 
@@ -11,6 +12,7 @@ macro_rules! impl_full_ops {
     ($($ty:ty: add($addfn:ident), mul/div($bigty:ident);)*) => (
         $(
             impl FullOps for $ty {
+                // carry' || v' <- self + other + carry
                 fn full_add(self, other: $ty, carry: bool) -> (bool, $ty) {
                     // this cannot overflow, the output is between 0 and 2*2^nbits - 1
                     // XXX will LLVM optimize this into ADC or similar???
@@ -19,6 +21,7 @@ macro_rules! impl_full_ops {
                     (carry1 || carry2, v)
                 }
 
+                // carry' || v' <- self * other + carry
                 fn full_mul(self, other: $ty, carry: $ty) -> ($ty, $ty) {
                     // this cannot overflow, the output is between 0 and 2^nbits * (2^nbits - 1)
                     let nbits = mem::size_of::<$ty>() * 8;
@@ -26,6 +29,16 @@ macro_rules! impl_full_ops {
                     ((v >> nbits) as $ty, v as $ty)
                 }
 
+                // carry' || v' <- self * other + other2 + carry
+                fn full_mul_add(self, other: $ty, other2: $ty, carry: $ty) -> ($ty, $ty) {
+                    // this cannot overflow, the output is between 0 and 2^(2*nbits) - 1
+                    let nbits = mem::size_of::<$ty>() * 8;
+                    let v = (self as $bigty) * (other as $bigty) + (other2 as $bigty) +
+                            (carry as $bigty);
+                    ((v >> nbits) as $ty, v as $ty)
+                }
+
+                // (quo, rem) <- (borrow || self) /% other
                 fn full_div_rem(self, other: $ty, borrow: $ty) -> ($ty, $ty) {
                     debug_assert!(borrow < other);
                     // this cannot overflow, the dividend is between 0 and other * 2^nbits - 1
@@ -169,6 +182,42 @@ macro_rules! define_bignum {
 
                 self.size = sz;
                 self
+            }
+
+            pub fn mul_digits(&self, other: &[$ty]) -> $name {
+                // the internal routine. works best when aa.len() <= bb.len().
+                fn mul_inner(aa: &[$ty], bb: &[$ty]) -> ([$ty; $n], usize) {
+                    use flt2dec::bignum::FullOps;
+
+                    let mut ret = [0; $n];
+                    let mut retsz = 0;
+                    for (i, &a) in aa.iter().enumerate() {
+                        if a == 0 { continue; }
+                        let mut sz = bb.len();
+                        let mut carry = 0;
+                        for (j, &b) in bb.iter().enumerate() {
+                            let (c, v) = a.full_mul_add(b, ret[i + j], carry);
+                            ret[i + j] = v;
+                            carry = c;
+                        }
+                        if carry > 0 {
+                            ret[i + sz] = carry;
+                            sz += 1;
+                        }
+                        if retsz < i + sz {
+                            retsz = i + sz;
+                        }
+                    }
+
+                    (ret, retsz)
+                }
+
+                let (ret, retsz) = if self.size < other.len() {
+                    mul_inner(&self.base[..self.size], other)
+                } else {
+                    mul_inner(other, &self.base[..self.size])
+                };
+                $name { size: retsz, base: ret }
             }
 
             pub fn div_rem_small(mut self, other: $ty) -> ($name, $ty) {
@@ -326,6 +375,29 @@ mod tests {
     #[should_panic]
     fn test_mul_pow2_overflow_2() {
         Big::from_u64(0x123).mul_pow2(16);
+    }
+
+    #[test]
+    fn test_mul_digits() {
+        assert_eq!(Big::from_small(3).mul_digits(&[5]), Big::from_small(15));
+        assert_eq!(Big::from_small(0xff).mul_digits(&[0xff]), Big::from_u64(0xfe01));
+        assert_eq!(Big::from_u64(0x123).mul_digits(&[0x56, 0x4]), Big::from_u64(0x4edc2));
+        assert_eq!(Big::from_u64(0x12345).mul_digits(&[0x67]), Big::from_u64(0x7530c3));
+        assert_eq!(Big::from_small(0x12).mul_digits(&[0x67, 0x45, 0x3]), Big::from_u64(0x3ae13e));
+        assert_eq!(Big::from_u64(0xffffff/13).mul_digits(&[13]), Big::from_u64(0xffffff));
+        assert_eq!(Big::from_small(13).mul_digits(&[0x3b, 0xb1, 0x13]), Big::from_u64(0xffffff));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_mul_digits_overflow_1() {
+        Big::from_u64(0x800000).mul_digits(&[2]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_mul_digits_overflow_2() {
+        Big::from_u64(0x1000).mul_digits(&[0, 0x10]);
     }
 
     #[test]
