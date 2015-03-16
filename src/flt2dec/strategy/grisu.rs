@@ -10,6 +10,7 @@ use std::num::{Int, Float};
 #[cfg(test)] use test;
 
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
+#[cfg(test)] use std::i16;
 #[cfg(test)] use flt2dec::testing;
 
 #[derive(Copy, Debug)]
@@ -486,7 +487,8 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     }
 }
 
-pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usize, /*exp*/ i16)> {
+pub fn format_exact_opt(d: &Decoded, buf: &mut [u8], limit: i16)
+                                -> Option<(/*#digits*/ usize, /*exp*/ i16)> {
     assert!(d.mant > 0);
     assert!(d.mant < (1 << 61)); // we need at least three bits of additional precision
     assert!(!buf.is_empty());
@@ -521,6 +523,21 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
     let mut i = 0;
     let exp = max_kappa as i16 - minusk + 1;
 
+    // if we are working with the last-digit limitation, we need to shorten the buffer
+    // before the actual rendering in order to avoid double rounding.
+    // note that we have to enlarge the buffer again when rounding up happens!
+    let len = if exp <= limit {
+        // oops, we cannot even produce *one* digit.
+        // this is possible when, say, we've got something like 9.5 and it's being rounded by 10.
+        // in this case, the rounding up does not work well with no digits rendered,
+        // so we first render one digit and avoid increasing the buffer later.
+        1
+    } else if ((exp as i32 - limit as i32) as usize) < buf.len() {
+        (exp - limit) as usize
+    } else {
+        buf.len()
+    };
+
     // render integral parts.
     // the error is entirely fractional, so we don't need to check it in this part.
     let mut kappa = max_kappa as i16;
@@ -540,9 +557,9 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
         i += 1;
 
         // is the buffer full? run the rounding pass with the remainder.
-        if i == buf.len() {
+        if i == len {
             let vrem = ((r as u64) << e) + vfrac; // == (v % 10^kappa) * 2^e
-            return possibly_round(&mut buf[..i], exp, vrem, (ten_kappa as u64) << e, err << e);
+            return possibly_round(buf, len, exp, limit, vrem, (ten_kappa as u64) << e, err << e);
         }
 
         // break the loop when we have rendered all integral digits.
@@ -591,8 +608,8 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
         i += 1;
 
         // is the buffer full? run the rounding pass with the remainder.
-        if i == buf.len() {
-            return possibly_round(&mut buf[..i], exp, r, 1 << e, err);
+        if i == len {
+            return possibly_round(buf, len, exp, limit, r, 1 << e, err);
         }
 
         // restore invariants
@@ -612,8 +629,8 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
     // - `remainder = (v % 10^kappa) * k`
     // - `ten_kappa = 10^kappa * k`
     // - `ulp = 2^-e * k`
-    fn possibly_round(buf: &mut [u8], mut exp: i16, remainder: u64, ten_kappa: u64,
-                      ulp: u64) -> Option<(usize, i16)> {
+    fn possibly_round(buf: &mut [u8], mut len: usize, mut exp: i16, limit: i16,
+                      remainder: u64, ten_kappa: u64, ulp: u64) -> Option<(usize, i16)> {
         debug_assert!(remainder < ten_kappa);
 
         //           10^kappa
@@ -668,7 +685,7 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
         // we've already verified that `ulp < 10^kappa / 2`, so as long as
         // `10^kappa` did not overflow after all, the second check is fine.
         if ten_kappa - remainder > remainder && ten_kappa - 2 * remainder >= 2 * ulp {
-            return Some((buf.len(), exp));
+            return Some((len, exp));
         }
 
         //   :<------- remainder ------>|   :
@@ -689,9 +706,16 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
         // as `10^kappa` is never zero). also note that `remainder - ulp <= 10^kappa`,
         // so the second check does not overflow.
         if remainder > ulp && ten_kappa - (remainder - ulp) <= remainder - ulp {
-            let len = buf.len();
-            if round_up(buf, len) { exp += 1; }
-            return Some((buf.len(), exp));
+            if round_up(buf, len) {
+                // only add an additional digit when we've been requested the fixed precision
+                // and it turns out that we need to render at least two digits.
+                if exp > limit && len < buf.len() {
+                    buf[len] = b'0';
+                    len += 1;
+                }
+                exp += 1;
+            }
+            return Some((len, exp));
         }
 
         // otherwise we are doomed (i.e. some values between `v - 1 ulp` and `v + 1 ulp` are
@@ -700,11 +724,11 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8]) -> Option<(/*#digits*/ usiz
     }
 }
 
-pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ i16) {
+pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usize, /*exp*/ i16) {
     use flt2dec::strategy::dragon::format_exact as fallback;
-    match format_exact_opt(d, buf) {
+    match format_exact_opt(d, buf, limit) {
         Some(ret) => ret,
-        None => fallback(d, buf),
+        None => fallback(d, buf, limit),
     }
 }
 
@@ -754,7 +778,8 @@ fn exact_sanity_test() {
 fn exact_f32_random_equivalence_test() {
     use flt2dec::strategy::dragon::format_exact as fallback;
     for k in 1..21 {
-        testing::f32_random_equivalence_test(format_exact_opt, fallback, k, 1_000);
+        testing::f32_random_equivalence_test(|d, buf| format_exact_opt(d, buf, i16::MIN),
+                                             |d, buf| fallback(d, buf, i16::MIN), k, 1_000);
     }
 }
 
@@ -762,7 +787,8 @@ fn exact_f32_random_equivalence_test() {
 fn exact_f64_random_equivalence_test() {
     use flt2dec::strategy::dragon::format_exact as fallback;
     for k in 1..21 {
-        testing::f64_random_equivalence_test(format_exact_opt, fallback, k, 1_000);
+        testing::f64_random_equivalence_test(|d, buf| format_exact_opt(d, buf, i16::MIN),
+                                             |d, buf| fallback(d, buf, i16::MIN), k, 1_000);
     }
 }
 
@@ -788,7 +814,7 @@ fn bench_small_exact_3(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
     let mut buf = [0; 3];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -797,7 +823,7 @@ fn bench_big_exact_3(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     let mut buf = [0; 3];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -805,7 +831,7 @@ fn bench_small_exact_12(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
     let mut buf = [0; 12];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -814,7 +840,7 @@ fn bench_big_exact_12(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     let mut buf = [0; 12];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -822,7 +848,7 @@ fn bench_small_exact_inf(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
     let mut buf = [0; 1024];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -831,6 +857,6 @@ fn bench_big_exact_inf(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     let mut buf = [0; 1024];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 

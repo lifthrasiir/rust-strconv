@@ -1,4 +1,4 @@
-use std::{str, mem};
+use std::{str, mem, i16};
 use std::num::Float;
 use std::slice::bytes;
 use rand;
@@ -23,6 +23,22 @@ macro_rules! check_shortest {
     })
 }
 
+macro_rules! try_exact {
+    ($fmt:ident($decoded:expr) => $buf:expr, $expected:expr, $expectedk:expr) => ({
+        let (len, k) = $fmt($decoded, &mut $buf[..$expected.len()], i16::MIN);
+        assert_eq!((str::from_utf8(&$buf[..len]).unwrap(), k),
+                   (str::from_utf8(&$expected).unwrap(), $expectedk));
+    })
+}
+
+macro_rules! try_fixed {
+    ($fmt:ident($decoded:expr) => $buf:expr, $expected:expr, $expectedk:expr) => ({
+        let (len, k) = $fmt($decoded, &mut $buf[..], $expectedk - $expected.len() as i16);
+        assert_eq!((str::from_utf8(&$buf[..len]).unwrap(), k),
+                   (str::from_utf8(&$expected).unwrap(), $expectedk));
+    })
+}
+
 macro_rules! check_exact {
     ($fmt:ident($v:expr) => $buf:expr, $exp:expr) => ({
         let expected = $buf;
@@ -37,9 +53,6 @@ macro_rules! check_exact {
 
         // check significant digits
         for i in range(1, cut.unwrap_or(expected.len() - 1)) {
-            let (len, k) = $fmt(&decoded, &mut buf[..i]);
-            assert_eq!(len, i);
-
             bytes::copy_memory(&mut expected_, &expected[..i]);
             let mut expectedk = expectedk;
             if expected[i] >= b'5' {
@@ -50,20 +63,18 @@ macro_rules! check_exact {
                 if round_up(&mut expected_, i) { expectedk += 1; }
             }
 
-            assert_eq!((str::from_utf8(&buf[..i]).unwrap(), k),
-                       (str::from_utf8(&expected_[..i]).unwrap(), expectedk));
+            try_exact!($fmt(&decoded) => &mut buf, &expected_[..i], expectedk);
+            try_fixed!($fmt(&decoded) => &mut buf, &expected_[..i], expectedk);
         }
 
         // check infinite zero digits
         if let Some(cut) = cut {
             for i in range(cut, expected.len() - 1) {
-                let (len, k) = $fmt(&decoded, &mut buf[..i]);
-                assert_eq!(len, i);
-
                 bytes::copy_memory(&mut expected_, &expected[..cut]);
                 for c in &mut expected_[cut..i] { *c = b'0'; }
-                assert_eq!((str::from_utf8(&buf[..i]).unwrap(), k),
-                           (str::from_utf8(&expected_[..i]).unwrap(), expectedk));
+
+                try_exact!($fmt(&decoded) => &mut buf, &expected_[..i], expectedk);
+                try_fixed!($fmt(&decoded) => &mut buf, &expected_[..i], expectedk);
             }
         }
     })
@@ -79,10 +90,8 @@ macro_rules! check_exact_one {
         let v: $t = Float::ldexp($x, $e);
         let decoded = decode(v);
 
-        let (len, k) = $fmt(&decoded, &mut buf[..expected.len()]);
-        assert_eq!(len, expected.len());
-        assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
-                   (str::from_utf8(&expected).unwrap(), expectedk));
+        try_exact!($fmt(&decoded) => &mut buf, &expected, expectedk);
+        try_fixed!($fmt(&decoded) => &mut buf, &expected, expectedk);
     })
 }
 
@@ -134,7 +143,8 @@ pub fn f32_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8])
     check_shortest!(f(minf32) => b"1", -44);
 }
 
-pub fn f32_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+pub fn f32_exact_sanity_test<F>(mut f: F)
+        where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     let maxf32: f32 = Float::max_value();
     let minnormf32: f32 = Float::min_pos_value(None);
     let minf32: f32 = Float::ldexp(1.0, -149);
@@ -235,7 +245,8 @@ pub fn f64_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8])
     check_shortest!(f(minf64) => b"5", -323);
 }
 
-pub fn f64_exact_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+pub fn f64_exact_sanity_test<F>(mut f: F)
+        where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     let maxf64: f64 = Float::max_value();
     let minnormf64: f64 = Float::min_pos_value(None);
     let minf64: f64 = Float::ldexp(1.0, -1074);

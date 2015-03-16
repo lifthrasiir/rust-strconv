@@ -93,12 +93,24 @@ Strategy | `u8` | `u16` | `u32` | `u64`
 Floating point number to decimal string for the valid representation (i.e. rounds to
 the original value when converted back). In progress.
 
-There are two possible modes of string conversion:
+There are three possible modes of string conversion:
 
 * **Shortest**: Produces the shortest representation among all numbers that round to given value.
   If there are multiple shortest representations, the closest one should be used.
 * **Exact**: Given the number of digits, produces the exactly rounded representation of given value.
   If the supplied buffer is enough for the exact representation, it stops at the last digit as well.
+* **Fixed**: Produces the exactly rounded representation of given value up to
+  given decimal position. The caller is expected to provide enough buffer.
+
+In order to reduce the complexity, rust-strconv merges the fixed mode into the exact mode:
+the exact mode implementation requires the "last-digit limitation" argument,
+which limits the number of digits to be returned in addition to the buffer size.
+(This argument is the same type to the exponent, and treated as such.)
+The caller is expected to estimate the number of digits required. The number might be off by a bit,
+so the caller should allocate a slightly larger buffer for the upper bound of estimate.
+Every exact mode implementation is able to calculate the exact exponent,
+so it adjusts for the last-digit limitation with almost no additional cost.
+The original exact mode can be invoked via the most relaxed limitation, i.e. `i16::MIN`.
 
 There are several strategies available:
 

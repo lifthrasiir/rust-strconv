@@ -12,6 +12,7 @@ use std::cmp::Ordering::{Greater, Equal};
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 use flt2dec::bignum::Digit32 as Digit;
 use flt2dec::bignum::Big32x36 as Big;
+#[cfg(test)] use std::i16;
 #[cfg(test)] use flt2dec::testing;
 
 // approximate k_0 = ceil(log_10 (mant * 2^exp))
@@ -89,6 +90,7 @@ static POW10TO256: [Digit; 27] =
      0xcc5573c0, 0x65f9ef17, 0x55bc28f2, 0x80dcc7f7, 0xf46eeddc, 0x5fdcefce, 0x553f7];
 
 fn mul_pow10(mut x: Big, n: usize) -> Big {
+    debug_assert!(n < 512);
     if n &   7 != 0 { x = x.mul_small(POW10[n & 7]); }
     if n &   8 != 0 { x = x.mul_small(POW10[8]); }
     if n &  16 != 0 { x = x.mul_digits(&POW10TO16); }
@@ -267,8 +269,8 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     // ii) both conditions were triggered and tie breaking prefers rounding up.
     if up && (!down || mant.mul_pow2(1) >= scale) {
         // if rounding up changes the length, the exponent should also change.
-        // note this condition is actually overflow (would set `buf[buf.len()]` if true),
-        // but we are just being consistent.
+        // it seems that this condition is very hard to satisfy (possibly impossible),
+        // but we are just being safe and consistent here.
         if round_up(buf, i) {
             buf[i] = b'0';
             i += 1;
@@ -279,7 +281,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     (i, k)
 }
 
-pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ i16) {
+pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usize, /*exp*/ i16) {
     // the stripped-down version of Dragon for fixed-size output.
 
     assert!(d.mant > 0);
@@ -318,12 +320,26 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ 
         mant = mant.mul_small(10);
     }
 
+    // if we are working with the last-digit limitation, we need to shorten the buffer
+    // before the actual rendering in order to avoid double rounding.
+    // note that we have to enlarge the buffer again when rounding up happens!
+    let mut len = if k <= limit {
+        // oops, we cannot even produce *one* digit.
+        // this is possible when, say, we've got something like 9.5 and it's being rounded by 10.
+        // in this case, the rounding up does not work well with no digits rendered,
+        // so we first render one digit and avoid increasing the buffer later.
+        1
+    } else if ((k as i32 - limit as i32) as usize) < buf.len() {
+        (k - limit) as usize
+    } else {
+        buf.len()
+    };
+
     // cache `(2, 4, 8) * scale` for digit generation.
     let scale2 = scale.mul_pow2(1);
     let scale4 = scale.mul_pow2(2);
     let scale8 = scale.mul_pow2(3);
 
-    let len = buf.len();
     for i in range(0, len) {
         if mant.is_zero() { // following digits are all zeroes, we stop here
             // do *not* try to perform rounding! rather, fill remaining digits.
@@ -344,14 +360,20 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ 
 
     // rounding up if we stop in the middle of digits
     if mant >= scale.mul_small(5) {
-        // if rounding up changes the length, the exponent should also change
-        // (but we've been requested a fixed number of digits, so do not alter the buffer)
+        // if rounding up changes the length, the exponent should also change.
+        // but we've been requested a fixed number of digits, so do not alter the buffer...
         if round_up(buf, len) {
+            // ...unless we've been requested the fixed precision instead and
+            // it turns out that we need to render at least two digits.
+            if k > limit && len < buf.len() {
+                buf[len] = b'0';
+                len += 1;
+            }
             k += 1;
         }
     }
 
-    (buf.len(), k)
+    (len, k)
 }
 
 #[cfg(test)] #[test]
@@ -389,7 +411,7 @@ fn bench_small_exact_3(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
     let mut buf = [0; 3];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -398,7 +420,7 @@ fn bench_big_exact_3(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     let mut buf = [0; 3];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -406,7 +428,7 @@ fn bench_small_exact_12(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
     let mut buf = [0; 12];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -415,7 +437,7 @@ fn bench_big_exact_12(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     let mut buf = [0; 12];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -423,7 +445,7 @@ fn bench_small_exact_inf(b: &mut test::Bencher) {
     use flt2dec::decode;
     let decoded = decode(3.141592f64);
     let mut buf = [0; 1024];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
@@ -432,6 +454,6 @@ fn bench_big_exact_inf(b: &mut test::Bencher) {
     let v: f64 = Float::max_value();
     let decoded = decode(v);
     let mut buf = [0; 1024];
-    b.iter(|| format_exact(&decoded, &mut buf));
+    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
