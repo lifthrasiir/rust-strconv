@@ -1,6 +1,7 @@
 pub use self::decoder::{decode, Decoded};
 
 mod intrin;
+mod estimator;
 #[macro_use] mod bignum;
 mod decoder;
 
