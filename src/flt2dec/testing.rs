@@ -52,7 +52,7 @@ macro_rules! check_exact {
         let cut = expected.iter().position(|&c| c == b' ');
 
         // check significant digits
-        for i in range(1, cut.unwrap_or(expected.len() - 1)) {
+        for i in 1..cut.unwrap_or(expected.len() - 1) {
             bytes::copy_memory(&mut expected_, &expected[..i]);
             let mut expectedk = expectedk;
             if expected[i] >= b'5' {
@@ -69,7 +69,7 @@ macro_rules! check_exact {
 
         // check infinite zero digits
         if let Some(cut) = cut {
-            for i in range(cut, expected.len() - 1) {
+            for i in cut..expected.len()-1 {
                 bytes::copy_memory(&mut expected_, &expected[..cut]);
                 for c in &mut expected_[cut..i] { *c = b'0'; }
 

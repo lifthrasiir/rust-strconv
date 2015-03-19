@@ -171,7 +171,7 @@ fn test_cached_power() {
     assert_eq!(CACHED_POW10.first().unwrap().1, CACHED_POW10_FIRST_E);
     assert_eq!(CACHED_POW10.last().unwrap().1, CACHED_POW10_LAST_E);
 
-    for e in range(-1137, 961) { // full range for f64
+    for e in -1137..961 { // full range for f64
         let low = ALPHA - e - 64;
         let high = GAMMA - e - 64;
         let (_k, cached) = cached_power(low, high);
@@ -207,7 +207,7 @@ fn max_pow10_no_more_than(x: u32) -> (u8, u32) {
 #[cfg(test)] #[test]
 fn test_max_pow10_no_more_than() {
     let mut prevtenk = 1;
-    for k in range(1, 10) {
+    for k in 1..10 {
         let tenk = prevtenk * 10;
         assert_eq!(max_pow10_no_more_than(tenk - 1), (k - 1, prevtenk));
         assert_eq!(max_pow10_no_more_than(tenk), (k, tenk));

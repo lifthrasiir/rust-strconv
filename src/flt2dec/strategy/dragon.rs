@@ -58,7 +58,7 @@ fn div_2pow10(mut x: Big, mut n: usize) -> Big {
 #[cfg(test)] #[test]
 fn test_mul_pow10() {
     let mut prevpow10 = Big::from_small(1);
-    for i in range(1, 340) {
+    for i in 1..340 {
         let curpow10 = mul_pow10(Big::from_small(1), i);
         assert_eq!(curpow10, prevpow10.mul_small(10));
         prevpow10 = curpow10;
@@ -285,7 +285,7 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usi
     let scale4 = scale.mul_pow2(2);
     let scale8 = scale.mul_pow2(3);
 
-    for i in range(0, len) {
+    for i in 0..len {
         if mant.is_zero() { // following digits are all zeroes, we stop here
             // do *not* try to perform rounding! rather, fill remaining digits.
             for c in &mut buf[i..len] { *c = b'0'; }

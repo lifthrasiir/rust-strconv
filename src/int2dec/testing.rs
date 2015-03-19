@@ -45,14 +45,14 @@ pub fn rotating_bench<I: Int, T, F: FnMut(I) -> T>(mut f: F, b: &mut Bencher) {
     b.iter(|| {
         // small integers (4, 5, 6, ..., 3424806)
         let mut n = NumCast::from(4).unwrap();
-        for _ in range(0, 64) {
+        for _ in 0..64 {
             test::black_box(f(n));
             n = n.wrapping_add(n >> 2);
         }
 
         // large integers
         let mut n = NumCast::from(1).unwrap();
-        for _ in range(0, 64) {
+        for _ in 0..64 {
             test::black_box(f(n));
             n = n.wrapping_mul(NumCast::from(3).unwrap());
         }

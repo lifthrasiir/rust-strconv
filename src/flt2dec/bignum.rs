@@ -156,10 +156,10 @@ macro_rules! define_bignum {
                 debug_assert!(bits == 0 || (self.base[$n-digits-1] >> (digitbits - bits)) == 0);
 
                 // shift by `digits * digitbits` bits
-                for i in range(0, self.size).rev() {
+                for i in (0..self.size).rev() {
                     self.base[i+digits] = self.base[i];
                 }
-                for i in range(0, digits) {
+                for i in 0..digits {
                     self.base[i] = 0;
                 }
 
@@ -172,7 +172,7 @@ macro_rules! define_bignum {
                         self.base[last] = overflow;
                         sz += 1;
                     }
-                    for i in range(digits+1, last).rev() {
+                    for i in (digits+1..last).rev() {
                         self.base[i] = (self.base[i] << bits) |
                                        (self.base[i-1] >> (digitbits - bits));
                     }

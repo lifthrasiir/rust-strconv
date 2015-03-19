@@ -57,7 +57,7 @@ impl_uint_to_dec!(u8, Digits8, u8_to_digits);
 #[cfg(test)] #[test]
 fn sanity_test() {
     let mut n = 1u64;
-    for _ in range(0, 64) {
+    for _ in 0..64 {
         assert_eq!((n as u64).to_string(), UintToDec(n as u64).to_string());
         assert_eq!((n as u32).to_string(), UintToDec(n as u32).to_string());
         assert_eq!((n as u16).to_string(), UintToDec(n as u16).to_string());
@@ -75,7 +75,7 @@ macro_rules! make_bench {
                 let mut n: $t = 1;
                 let mut buf = [0; 4096];
                 let mut w = Cursor::new(&mut buf[..]);
-                for _ in range(0, 64) {
+                for _ in 0..64 {
                     let _ = write!(&mut w, "{}", n);
                     n = n.wrapping_mul(3);
                 }
@@ -89,7 +89,7 @@ macro_rules! make_bench {
                 let mut n: $t = 1;
                 let mut buf = [0; 4096];
                 let mut w = Cursor::new(&mut buf[..]);
-                for _ in range(0, 64) {
+                for _ in 0..64 {
                     let _ = write!(&mut w, "{}", UintToDec(n));
                     n = n.wrapping_mul(3);
                 }

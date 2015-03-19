@@ -24,12 +24,12 @@ fn round_up(d: &mut [u8], n: usize) -> bool {
     match d[..n].iter().rposition(|&c| c != b'9') {
         Some(i) => { // d[i+1..n] is all nines
             d[i] += 1;
-            for j in range(i+1, n) { d[j] = b'0'; }
+            for j in i+1..n { d[j] = b'0'; }
             false
         }
         None => { // 999..999 rounds to 1000..000 with an increased exponent
             d[0] = b'1';
-            for j in range(1, n) { d[j] = b'0'; }
+            for j in 1..n { d[j] = b'0'; }
             true
         }
     }
