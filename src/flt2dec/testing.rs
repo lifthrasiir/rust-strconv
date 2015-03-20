@@ -9,39 +9,62 @@ use flt2dec::{to_shortest_str, to_shortest_exp_str, to_exact_exp_str, to_exact_f
 pub use test::Bencher;
 
 macro_rules! check_shortest {
-    ($fmt:ident($v:expr) => $buf:expr, $exp:expr) => ({
+    ($f:ident($v:expr) => $buf:expr, $exp:expr) => (
+        check_shortest!($f($v) => $buf, $exp;
+                        "shortest mismatch for v={v}: {actual:?} != {expected:?}",
+                        v = stringify!($v))
+    );
+
+    ($f:ident{$($k:ident: $v:expr),+} => $buf:expr, $exp:expr) => (
+        check_shortest!($f{$($k: $v),+} => $buf, $exp;
+                        "shortest mismatch for {v:?}: {actual:?} != {expected:?}",
+                        v = Decoded { $($k: $v),+ })
+    );
+
+    ($f:ident($v:expr) => $buf:expr, $exp:expr; $fmt:expr, $($key:ident = $val:expr),*) => ({
         let mut buf = [b'_'; MAX_SIG_DIGITS];
-        let (len, k) = $fmt(&decode($v), &mut buf);
-        assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
-                   (str::from_utf8($buf).unwrap(), $exp));
+        let (len, k) = $f(&decode($v), &mut buf);
+        assert!((&buf[..len], k) == ($buf, $exp),
+                $fmt, actual = (str::from_utf8(&buf[..len]).unwrap(), k),
+                      expected = (str::from_utf8($buf).unwrap(), $exp),
+                      $($key = $val),*);
     });
 
-    ($fmt:ident{$($k:ident: $v:expr),+} => $buf:expr, $exp:expr) => ({
+    ($f:ident{$($k:ident: $v:expr),+} => $buf:expr, $exp:expr;
+                                         $fmt:expr, $($key:ident = $val:expr),*) => ({
         let mut buf = [b'_'; MAX_SIG_DIGITS];
-        let (len, k) = $fmt(&Decoded { $($k: $v),+ }, &mut buf);
-        assert_eq!((str::from_utf8(&buf[..len]).unwrap(), k),
-                   (str::from_utf8($buf).unwrap(), $exp));
+        let (len, k) = $f(&Decoded { $($k: $v),+ }, &mut buf);
+        assert!((&buf[..len], k) == ($buf, $exp),
+                $fmt, actual = (str::from_utf8(&buf[..len]).unwrap(), k),
+                      expected = (str::from_utf8($buf).unwrap(), $exp),
+                      $($key = $val),*);
     })
 }
 
 macro_rules! try_exact {
-    ($fmt:ident($decoded:expr) => $buf:expr, $expected:expr, $expectedk:expr) => ({
-        let (len, k) = $fmt($decoded, &mut $buf[..$expected.len()], i16::MIN);
-        assert_eq!((str::from_utf8(&$buf[..len]).unwrap(), k),
-                   (str::from_utf8(&$expected).unwrap(), $expectedk));
+    ($f:ident($decoded:expr) => $buf:expr, $expected:expr, $expectedk:expr;
+                                $fmt:expr, $($key:ident = $val:expr),*) => ({
+        let (len, k) = $f($decoded, &mut $buf[..$expected.len()], i16::MIN);
+        assert!((&$buf[..len], k) == ($expected, $expectedk),
+                $fmt, actual = (str::from_utf8(&$buf[..len]).unwrap(), k),
+                      expected = (str::from_utf8($expected).unwrap(), $expectedk),
+                      $($key = $val),*);
     })
 }
 
 macro_rules! try_fixed {
-    ($fmt:ident($decoded:expr) => $buf:expr, $expected:expr, $expectedk:expr) => ({
-        let (len, k) = $fmt($decoded, &mut $buf[..], $expectedk - $expected.len() as i16);
-        assert_eq!((str::from_utf8(&$buf[..len]).unwrap(), k),
-                   (str::from_utf8(&$expected).unwrap(), $expectedk));
+    ($f:ident($decoded:expr) => $buf:expr, $request:expr, $expected:expr, $expectedk:expr;
+                                $fmt:expr, $($key:ident = $val:expr),*) => ({
+        let (len, k) = $f($decoded, &mut $buf[..], $expectedk - $request as i16);
+        assert!((&$buf[..len], k) == ($expected, $expectedk),
+                $fmt, actual = (str::from_utf8(&$buf[..len]).unwrap(), k),
+                      expected = (str::from_utf8($expected).unwrap(), $expectedk),
+                      $($key = $val),*);
     })
 }
 
 macro_rules! check_exact {
-    ($fmt:ident($v:expr) => $buf:expr, $exp:expr) => ({
+    ($f:ident($v:expr) => $buf:expr, $exp:expr) => ({
         let expected = $buf;
         let expectedk = $exp;
 
@@ -55,17 +78,21 @@ macro_rules! check_exact {
         // check significant digits
         for i in 1..cut.unwrap_or(expected.len() - 1) {
             bytes::copy_memory(&mut expected_, &expected[..i]);
-            let mut expectedk = expectedk;
+            let mut expectedk_ = expectedk;
             if expected[i] >= b'5' {
                 // if this returns true, expected_[..i] is all `9`s and being rounded up.
                 // we should always return `100..00` (`i` digits) instead, since that's
                 // what we can came up with `i` digits anyway. `round_up` assumes that
                 // the adjustment to the length is done by caller, which we simply ignore.
-                if round_up(&mut expected_, i) { expectedk += 1; }
+                if round_up(&mut expected_, i) { expectedk_ += 1; }
             }
 
-            try_exact!($fmt(&decoded) => &mut buf, &expected_[..i], expectedk);
-            try_fixed!($fmt(&decoded) => &mut buf, &expected_[..i], expectedk);
+            try_exact!($f(&decoded) => &mut buf, &expected_[..i], expectedk_;
+                       "exact sigdigit mismatch for v={v}, i={i}: {actual:?} != {expected:?}",
+                       v = stringify!($v), i = i);
+            try_fixed!($f(&decoded) => &mut buf, i, &expected_[..i], expectedk_;
+                       "fixed sigdigit mismatch for v={v}, i={i}: {actual:?} != {expected:?}",
+                       v = stringify!($v), i = i);
         }
 
         // check infinite zero digits
@@ -74,15 +101,19 @@ macro_rules! check_exact {
                 bytes::copy_memory(&mut expected_, &expected[..cut]);
                 for c in &mut expected_[cut..i] { *c = b'0'; }
 
-                try_exact!($fmt(&decoded) => &mut buf, &expected_[..i], expectedk);
-                try_fixed!($fmt(&decoded) => &mut buf, &expected_[..i], expectedk);
+                try_exact!($f(&decoded) => &mut buf, &expected_[..i], expectedk;
+                           "exact infzero mismatch for v={v}, i={i}: {actual:?} != {expected:?}",
+                           v = stringify!($v), i = i);
+                try_fixed!($f(&decoded) => &mut buf, i, &expected_[..i], expectedk;
+                           "fixed infzero mismatch for v={v}, i={i}: {actual:?} != {expected:?}",
+                           v = stringify!($v), i = i);
             }
         }
     })
 }
 
 macro_rules! check_exact_one {
-    ($fmt:ident($x:expr, $e:expr; $t:ty) => $buf:expr, $exp:expr) => ({
+    ($f:ident($x:expr, $e:expr; $t:ty) => $buf:expr, $exp:expr) => ({
         let expected = $buf;
         let expectedk = $exp;
 
@@ -91,8 +122,12 @@ macro_rules! check_exact_one {
         let v: $t = Float::ldexp($x, $e);
         let decoded = decode(v);
 
-        try_exact!($fmt(&decoded) => &mut buf, &expected, expectedk);
-        try_fixed!($fmt(&decoded) => &mut buf, &expected, expectedk);
+        try_exact!($f(&decoded) => &mut buf, &expected, expectedk;
+                   "exact mismatch for v={x}p{e}{t}: {actual:?} != {expected:?}",
+                   x = $x, e = $e, t = stringify!($t));
+        try_fixed!($f(&decoded) => &mut buf, expected.len(), &expected, expectedk;
+                   "fixed mismatch for v={x}p{e}{t}: {actual:?} != {expected:?}",
+                   x = $x, e = $e, t = stringify!($t));
     })
 }
 
