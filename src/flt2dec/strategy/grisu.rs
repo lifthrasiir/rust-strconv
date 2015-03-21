@@ -1,4 +1,4 @@
-/*
+/*!
 Rust adaptation of Grisu3 algorithm described in [1]. It uses about
 1KB of precomputed table, and in turn, it's very quick for most inputs.
 

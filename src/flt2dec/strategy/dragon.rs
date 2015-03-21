@@ -1,5 +1,5 @@
-/*
-almost direct (but slightly optimized) Rust translation of Figure 3 of [1].
+/*!
+Almost direct (but slightly optimized) Rust translation of Figure 3 of [1].
 
 [1] Burger, R. G. and Dybvig, R. K. 1996. Printing floating-point numbers
     quickly and accurately. SIGPLAN Not. 31, 5 (May. 1996), 108-116.

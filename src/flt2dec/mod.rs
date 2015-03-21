@@ -75,7 +75,7 @@ extensively describes all necessary justifications and many proofs for them.
 
 Both implementations expose two public functions:
 
-- `format_shortest(decoded, buf)`, which always need at least
+- `format_shortest(decoded, buf)`, which always needs at least
   `MAX_SIG_DIGITS` digits of buffer. Implements the shortest mode.
 
 - `format_exact(decoded, buf, limit)`, which accepts as small as
