@@ -528,15 +528,20 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8], limit: i16)
     // note that we have to enlarge the buffer again when rounding up happens!
     let len = if exp <= limit {
         // oops, we cannot even produce *one* digit.
-        // this is possible when, say, we've got something like 9.5 and it's being rounded by 10.
-        // in this case, the rounding up does not work well with no digits rendered,
-        // so we first render one digit and avoid increasing the buffer later.
-        1
+        // this is possible when, say, we've got something like 9.5 and it's being rounded to 10.
+        //
+        // in principle we can immediately call `possibly_round` with an empty buffer,
+        // but scaling `max_ten_kappa << e` by 10 can result in overflow.
+        // thus we are being sloppy here and widen the error range by a factor of 10.
+        // this will increase the false negative rate, but only very, *very* slightly;
+        // it can only matter noticably when the mantissa is bigger than 60 bits.
+        return possibly_round(buf, 0, exp, limit, v.f / 10, (max_ten_kappa as u64) << e, err << e);
     } else if ((exp as i32 - limit as i32) as usize) < buf.len() {
         (exp - limit) as usize
     } else {
         buf.len()
     };
+    debug_assert!(len > 0);
 
     // render integral parts.
     // the error is entirely fractional, so we don't need to check it in this part.
@@ -706,14 +711,15 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8], limit: i16)
         // as `10^kappa` is never zero). also note that `remainder - ulp <= 10^kappa`,
         // so the second check does not overflow.
         if remainder > ulp && ten_kappa - (remainder - ulp) <= remainder - ulp {
-            if round_up(buf, len) {
-                // only add an additional digit when we've been requested the fixed precision
-                // and it turns out that we need to render at least two digits.
+            if let Some(c) = round_up(buf, len) {
+                // only add an additional digit when we've been requested the fixed precision.
+                // we also need to check that, if the original buffer was empty,
+                // the additional digit can only be added when `exp == limit` (edge case).
+                exp += 1;
                 if exp > limit && len < buf.len() {
-                    buf[len] = b'0';
+                    buf[len] = c;
                     len += 1;
                 }
-                exp += 1;
             }
             return Some((len, exp));
         }

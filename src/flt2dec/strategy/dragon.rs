@@ -216,8 +216,8 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
         // if rounding up changes the length, the exponent should also change.
         // it seems that this condition is very hard to satisfy (possibly impossible),
         // but we are just being safe and consistent here.
-        if round_up(buf, i) {
-            buf[i] = b'0';
+        if let Some(c) = round_up(buf, i) {
+            buf[i] = c;
             i += 1;
             k += 1;
         }
@@ -227,8 +227,6 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
 }
 
 pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usize, /*exp*/ i16) {
-    // the stripped-down version of Dragon for fixed-size output.
-
     assert!(d.mant > 0);
     assert!(d.minus > 0);
     assert!(d.plus > 0);
@@ -268,53 +266,57 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usi
     // if we are working with the last-digit limitation, we need to shorten the buffer
     // before the actual rendering in order to avoid double rounding.
     // note that we have to enlarge the buffer again when rounding up happens!
-    let mut len = if k <= limit {
+    let mut len = if k < limit {
         // oops, we cannot even produce *one* digit.
-        // this is possible when, say, we've got something like 9.5 and it's being rounded by 10.
-        // in this case, the rounding up does not work well with no digits rendered,
-        // so we first render one digit and avoid increasing the buffer later.
-        1
+        // this is possible when, say, we've got something like 9.5 and it's being rounded to 10.
+        // we return an empty buffer, with an exception of the later rounding-up case
+        // which occurs when `k == limit` and has to produce exactly one digit.
+        0
     } else if ((k as i32 - limit as i32) as usize) < buf.len() {
         (k - limit) as usize
     } else {
         buf.len()
     };
 
-    // cache `(2, 4, 8) * scale` for digit generation.
-    let scale2 = scale.mul_pow2(1);
-    let scale4 = scale.mul_pow2(2);
-    let scale8 = scale.mul_pow2(3);
+    if len > 0 {
+        // cache `(2, 4, 8) * scale` for digit generation.
+        // (this can be expensive, so do not calculate them when the buffer is empty.)
+        let scale2 = scale.mul_pow2(1);
+        let scale4 = scale.mul_pow2(2);
+        let scale8 = scale.mul_pow2(3);
 
-    for i in 0..len {
-        if mant.is_zero() { // following digits are all zeroes, we stop here
-            // do *not* try to perform rounding! rather, fill remaining digits.
-            for c in &mut buf[i..len] { *c = b'0'; }
-            return (len, k);
+        for i in 0..len {
+            if mant.is_zero() { // following digits are all zeroes, we stop here
+                // do *not* try to perform rounding! rather, fill remaining digits.
+                for c in &mut buf[i..len] { *c = b'0'; }
+                return (len, k);
+            }
+
+            let mut d = 0;
+            if mant >= scale8 { mant = mant.sub(&scale8); d += 8; }
+            if mant >= scale4 { mant = mant.sub(&scale4); d += 4; }
+            if mant >= scale2 { mant = mant.sub(&scale2); d += 2; }
+            if mant >= scale  { mant = mant.sub(&scale);  d += 1; }
+            debug_assert!(mant < scale);
+            debug_assert!(d < 10);
+            buf[i] = b'0' + d;
+            mant = mant.mul_small(10);
         }
-
-        let mut d = 0;
-        if mant >= scale8 { mant = mant.sub(&scale8); d += 8; }
-        if mant >= scale4 { mant = mant.sub(&scale4); d += 4; }
-        if mant >= scale2 { mant = mant.sub(&scale2); d += 2; }
-        if mant >= scale  { mant = mant.sub(&scale);  d += 1; }
-        debug_assert!(mant < scale);
-        debug_assert!(d < 10);
-        buf[i] = b'0' + d;
-        mant = mant.mul_small(10);
     }
 
     // rounding up if we stop in the middle of digits
     if mant >= scale.mul_small(5) {
         // if rounding up changes the length, the exponent should also change.
         // but we've been requested a fixed number of digits, so do not alter the buffer...
-        if round_up(buf, len) {
-            // ...unless we've been requested the fixed precision instead and
-            // it turns out that we need to render at least two digits.
+        if let Some(c) = round_up(buf, len) {
+            // ...unless we've been requested the fixed precision instead.
+            // we also need to check that, if the original buffer was empty,
+            // the additional digit can only be added when `k == limit` (edge case).
+            k += 1;
             if k > limit && len < buf.len() {
-                buf[len] = b'0';
+                buf[len] = c;
                 len += 1;
             }
-            k += 1;
         }
     }
 

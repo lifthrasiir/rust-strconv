@@ -22,22 +22,25 @@ pub const MAX_SIG_DIGITS: usize = 17;
 
 // when d[..n] contains decimal digits, increase the last digit and propagate carry.
 // returns true when it causes the length change.
-fn round_up(d: &mut [u8], n: usize) -> bool {
+fn round_up(d: &mut [u8], n: usize) -> Option<u8> {
     match d[..n].iter().rposition(|&c| c != b'9') {
         Some(i) => { // d[i+1..n] is all nines
             d[i] += 1;
             for j in i+1..n { d[j] = b'0'; }
-            false
+            None
         }
-        None => { // 999..999 rounds to 1000..000 with an increased exponent
+        None if n > 0 => { // 999..999 rounds to 1000..000 with an increased exponent
             d[0] = b'1';
             for j in 1..n { d[j] = b'0'; }
-            true
+            Some(b'0')
+        }
+        None => { // an empty buffer rounds up (a bit strange but reasonable)
+            Some(b'1')
         }
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Part<'a> {
     Zero(usize),
     Num(u16),
@@ -148,7 +151,7 @@ fn digits_to_exp_str<'a>(buf: &'a [u8], exp: i16, min_ndigits: usize, upper: boo
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Sign {
     Minus,        // -1  0  0  1
     MinusPlus,    // -1 +0 +0 +1
@@ -373,7 +376,7 @@ pub fn to_exact_fixed_str<'a, T: Float, F>(mut format_exact: F, v: T,
                 // hasn't been met, so we catch this condition and treats as like zeroes.
                 // this does not include the case that the restriction has been met
                 // only after the final rounding-up; it's a regular case with `exp = limit + 1`.
-                debug_assert_eq!(len, 1);
+                debug_assert_eq!(len, 0);
                 if frac_digits > 0 { // [0.][0000]
                     parts[n] = Part::Copy(b"0.");
                     parts[n + 1] = Part::Zero(frac_digits);

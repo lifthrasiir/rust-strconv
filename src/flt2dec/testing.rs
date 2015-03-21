@@ -1,4 +1,4 @@
-use std::{str, mem, i16};
+use std::{str, mem, i16, fmt};
 use std::num::Float;
 use std::slice::bytes;
 use rand;
@@ -11,13 +11,13 @@ pub use test::Bencher;
 macro_rules! check_shortest {
     ($f:ident($v:expr) => $buf:expr, $exp:expr) => (
         check_shortest!($f($v) => $buf, $exp;
-                        "shortest mismatch for v={v}: {actual:?} != {expected:?}",
+                        "shortest mismatch for v={v}: actual {actual:?}, expected {expected:?}",
                         v = stringify!($v))
     );
 
     ($f:ident{$($k:ident: $v:expr),+} => $buf:expr, $exp:expr) => (
         check_shortest!($f{$($k: $v),+} => $buf, $exp;
-                        "shortest mismatch for {v:?}: {actual:?} != {expected:?}",
+                        "shortest mismatch for {v:?}: actual {actual:?}, expected {expected:?}",
                         v = Decoded { $($k: $v),+ })
     );
 
@@ -55,7 +55,7 @@ macro_rules! try_exact {
 macro_rules! try_fixed {
     ($f:ident($decoded:expr) => $buf:expr, $request:expr, $expected:expr, $expectedk:expr;
                                 $fmt:expr, $($key:ident = $val:expr),*) => ({
-        let (len, k) = $f($decoded, &mut $buf[..], $expectedk - $request as i16);
+        let (len, k) = $f($decoded, &mut $buf[..], $request);
         assert!((&$buf[..len], k) == ($expected, $expectedk),
                 $fmt, actual = (str::from_utf8(&$buf[..len]).unwrap(), k),
                       expected = (str::from_utf8($expected).unwrap(), $expectedk),
@@ -63,72 +63,99 @@ macro_rules! try_fixed {
     })
 }
 
+fn check_exact<F, T: Float>(mut f: F, v: T, vstr: &str, expected: &[u8], expectedk: i16)
+        where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+    // use a large enough buffer
+    let mut buf = [b'_'; 1024];
+    let mut expected_ = [b'_'; 1024];
+
+    let decoded = decode(v);
+    let cut = expected.iter().position(|&c| c == b' ');
+
+    // check significant digits
+    for i in 1..cut.unwrap_or(expected.len() - 1) {
+        bytes::copy_memory(&mut expected_, &expected[..i]);
+        let mut expectedk_ = expectedk;
+        if expected[i] >= b'5' {
+            // if this returns true, expected_[..i] is all `9`s and being rounded up.
+            // we should always return `100..00` (`i` digits) instead, since that's
+            // what we can came up with `i` digits anyway. `round_up` assumes that
+            // the adjustment to the length is done by caller, which we simply ignore.
+            if let Some(_) = round_up(&mut expected_, i) { expectedk_ += 1; }
+        }
+
+        try_exact!(f(&decoded) => &mut buf, &expected_[..i], expectedk_;
+                   "exact sigdigit mismatch for v={v}, i={i}: \
+                    actual {actual:?}, expected {expected:?}",
+                   v = vstr, i = i);
+        try_fixed!(f(&decoded) => &mut buf, expectedk_ - i as i16, &expected_[..i], expectedk_;
+                   "fixed sigdigit mismatch for v={v}, i={i}: \
+                    actual {actual:?}, expected {expected:?}",
+                   v = vstr, i = i);
+    }
+
+    // check exact rounding for zero- and negative-width cases
+    let start;
+    if expected[0] >= b'5' {
+        try_fixed!(f(&decoded) => &mut buf, expectedk, b"1", expectedk + 1;
+                   "zero-width rounding-up mismatch for v={v}: \
+                    actual {actual:?}, expected {expected:?}",
+                   v = vstr);
+        start = 1;
+    } else {
+        start = 0;
+    }
+    for i in start..-10 {
+        try_fixed!(f(&decoded) => &mut buf, expectedk - i, b"", expectedk;
+                   "rounding-down mismatch for v={v}, i={i}: \
+                    actual {actual:?}, expected {expected:?}",
+                   v = vstr, i = -i);
+    }
+
+    // check infinite zero digits
+    if let Some(cut) = cut {
+        for i in cut..expected.len()-1 {
+            bytes::copy_memory(&mut expected_, &expected[..cut]);
+            for c in &mut expected_[cut..i] { *c = b'0'; }
+
+            try_exact!(f(&decoded) => &mut buf, &expected_[..i], expectedk;
+                       "exact infzero mismatch for v={v}, i={i}: \
+                        actual {actual:?}, expected {expected:?}",
+                       v = vstr, i = i);
+            try_fixed!(f(&decoded) => &mut buf, expectedk - i as i16, &expected_[..i], expectedk;
+                       "fixed infzero mismatch for v={v}, i={i}: \
+                        actual {actual:?}, expected {expected:?}",
+                       v = vstr, i = i);
+        }
+    }
+}
+
+fn check_exact_one<F, T: Float + fmt::Display>(mut f: F, x: T, e: isize, tstr: &str,
+                                               expected: &[u8], expectedk: i16)
+        where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+    // use a large enough buffer
+    let mut buf = [b'_'; 1024];
+    let v: T = Float::ldexp(x, e);
+    let decoded = decode(v);
+
+    try_exact!(f(&decoded) => &mut buf, &expected, expectedk;
+               "exact mismatch for v={x}p{e}{t}: actual {actual:?}, expected {expected:?}",
+               x = x, e = e, t = tstr);
+    try_fixed!(f(&decoded) => &mut buf, expectedk - expected.len() as i16, &expected, expectedk;
+               "fixed mismatch for v={x}p{e}{t}: actual {actual:?}, expected {expected:?}",
+               x = x, e = e, t = tstr);
+}
+
 macro_rules! check_exact {
-    ($f:ident($v:expr) => $buf:expr, $exp:expr) => ({
-        let expected = $buf;
-        let expectedk = $exp;
-
-        // use a large enough buffer
-        let mut buf = [b'_'; 1024];
-        let mut expected_ = [b'_'; 1024];
-
-        let decoded = decode($v);
-        let cut = expected.iter().position(|&c| c == b' ');
-
-        // check significant digits
-        for i in 1..cut.unwrap_or(expected.len() - 1) {
-            bytes::copy_memory(&mut expected_, &expected[..i]);
-            let mut expectedk_ = expectedk;
-            if expected[i] >= b'5' {
-                // if this returns true, expected_[..i] is all `9`s and being rounded up.
-                // we should always return `100..00` (`i` digits) instead, since that's
-                // what we can came up with `i` digits anyway. `round_up` assumes that
-                // the adjustment to the length is done by caller, which we simply ignore.
-                if round_up(&mut expected_, i) { expectedk_ += 1; }
-            }
-
-            try_exact!($f(&decoded) => &mut buf, &expected_[..i], expectedk_;
-                       "exact sigdigit mismatch for v={v}, i={i}: {actual:?} != {expected:?}",
-                       v = stringify!($v), i = i);
-            try_fixed!($f(&decoded) => &mut buf, i, &expected_[..i], expectedk_;
-                       "fixed sigdigit mismatch for v={v}, i={i}: {actual:?} != {expected:?}",
-                       v = stringify!($v), i = i);
-        }
-
-        // check infinite zero digits
-        if let Some(cut) = cut {
-            for i in cut..expected.len()-1 {
-                bytes::copy_memory(&mut expected_, &expected[..cut]);
-                for c in &mut expected_[cut..i] { *c = b'0'; }
-
-                try_exact!($f(&decoded) => &mut buf, &expected_[..i], expectedk;
-                           "exact infzero mismatch for v={v}, i={i}: {actual:?} != {expected:?}",
-                           v = stringify!($v), i = i);
-                try_fixed!($f(&decoded) => &mut buf, i, &expected_[..i], expectedk;
-                           "fixed infzero mismatch for v={v}, i={i}: {actual:?} != {expected:?}",
-                           v = stringify!($v), i = i);
-            }
-        }
-    })
+    ($f:ident($v:expr) => $buf:expr, $exp:expr) => (
+        check_exact(|d,b,k| $f(d,b,k), $v, stringify!($v), $buf, $exp)
+    )
 }
 
 macro_rules! check_exact_one {
-    ($f:ident($x:expr, $e:expr; $t:ty) => $buf:expr, $exp:expr) => ({
-        let expected = $buf;
-        let expectedk = $exp;
-
-        // use a large enough buffer
-        let mut buf = [b'_'; 1024];
-        let v: $t = Float::ldexp($x, $e);
-        let decoded = decode(v);
-
-        try_exact!($f(&decoded) => &mut buf, &expected, expectedk;
-                   "exact mismatch for v={x}p{e}{t}: {actual:?} != {expected:?}",
-                   x = $x, e = $e, t = stringify!($t));
-        try_fixed!($f(&decoded) => &mut buf, expected.len(), &expected, expectedk;
-                   "fixed mismatch for v={x}p{e}{t}: {actual:?} != {expected:?}",
-                   x = $x, e = $e, t = stringify!($t));
-    })
+    ($f:ident($x:expr, $e:expr; $t:ty) => $buf:expr, $exp:expr) => (
+        check_exact_one::<_, $t>(|d,b,k| $f(d,b,k), $x, $e, stringify!($t), $buf, $exp)
+    )
 }
 
 // in the following comments, three numbers are spaced by 1 ulp apart,
@@ -288,7 +315,10 @@ pub fn f64_exact_sanity_test<F>(mut f: F)
     let minf64: f64 = Float::ldexp(1.0, -1074);
 
     check_exact!(f(0.1f64)         => b"1000000000000000055511151231257827021181", 0);
+    check_exact!(f(0.45f64)        => b"4500000000000000111022302462515654042363", 0);
+    check_exact!(f(0.95f64)        => b"9499999999999999555910790149937383830547", 0);
     check_exact!(f(100.0f64)       => b"1                                       ", 3);
+    check_exact!(f(999.5f64)       => b"9995000000000000000000000000000000000000", 3);
     check_exact!(f(1.0f64/3.0)     => b"3333333333333333148296162562473909929394", 0);
     check_exact!(f(3.141592f64)    => b"3141592000000000162174274009885266423225", 1);
     check_exact!(f(3.141592e17f64) => b"3141592                                 ", 18);
@@ -923,16 +953,33 @@ pub fn to_exact_fixed_str_test<F>(mut f_: F)
     assert_eq!(to_string(f, 999.5, Minus,  3, false), "999.500");
     assert_eq!(to_string(f, 999.5, Minus, 30, false), "999.500000000000000000000000000000");
 
-//  assert_eq!(to_string(f, 0.95, Minus,  0, false), "1");
+    assert_eq!(to_string(f, 0.95, Minus,  0, false), "1");
     assert_eq!(to_string(f, 0.95, Minus,  1, false), "0.9"); // because it really is less than 0.95
     assert_eq!(to_string(f, 0.95, Minus,  2, false), "0.95");
     assert_eq!(to_string(f, 0.95, Minus,  3, false), "0.950");
     assert_eq!(to_string(f, 0.95, Minus, 10, false), "0.9500000000");
     assert_eq!(to_string(f, 0.95, Minus, 30, false), "0.949999999999999955591079014994");
 
+    assert_eq!(to_string(f, 0.095, Minus,  0, false), "0");
+    assert_eq!(to_string(f, 0.095, Minus,  1, false), "0.1");
+    assert_eq!(to_string(f, 0.095, Minus,  2, false), "0.10");
+    assert_eq!(to_string(f, 0.095, Minus,  3, false), "0.095");
+    assert_eq!(to_string(f, 0.095, Minus,  4, false), "0.0950");
+    assert_eq!(to_string(f, 0.095, Minus, 10, false), "0.0950000000");
+    assert_eq!(to_string(f, 0.095, Minus, 30, false), "0.095000000000000001110223024625");
+
+    assert_eq!(to_string(f, 0.0095, Minus,  0, false), "0");
+    assert_eq!(to_string(f, 0.0095, Minus,  1, false), "0.0");
+    assert_eq!(to_string(f, 0.0095, Minus,  2, false), "0.01");
+    assert_eq!(to_string(f, 0.0095, Minus,  3, false), "0.009"); // really is less than 0.0095
+    assert_eq!(to_string(f, 0.0095, Minus,  4, false), "0.0095");
+    assert_eq!(to_string(f, 0.0095, Minus,  5, false), "0.00950");
+    assert_eq!(to_string(f, 0.0095, Minus, 10, false), "0.0095000000");
+    assert_eq!(to_string(f, 0.0095, Minus, 30, false), "0.009499999999999999764077607267");
+
     assert_eq!(to_string(f, 7.5e-11, Minus,  0, false), "0");
     assert_eq!(to_string(f, 7.5e-11, Minus,  3, false), "0.000");
-//  assert_eq!(to_string(f, 7.5e-11, Minus, 10, false), "0.0000000001");
+    assert_eq!(to_string(f, 7.5e-11, Minus, 10, false), "0.0000000001");
     assert_eq!(to_string(f, 7.5e-11, Minus, 11, false), "0.00000000007"); // ditto
     assert_eq!(to_string(f, 7.5e-11, Minus, 12, false), "0.000000000075");
     assert_eq!(to_string(f, 7.5e-11, Minus, 13, false), "0.0000000000750");
