@@ -1,7 +1,11 @@
+//! The exponent estimator.
+
 use core::num::Int;
 
-// finds `k_0` such that `10^(k_0-1) < mant * 2^exp <= 10^(k_0+1)`.
-// used to approximate `k = ceil(log_10 (mant * 2^exp))` (the true `k` is either `k_0` or `k_0+1`).
+/// Finds `k_0` such that `10^(k_0-1) < mant * 2^exp <= 10^(k_0+1)`.
+///
+/// This is used to approximate `k = ceil(log_10 (mant * 2^exp))`;
+/// the true `k` is either `k_0` or `k_0+1`.
 #[doc(hidden)]
 pub fn estimate_scaling_factor(mant: u64, exp: i16) -> i16 {
     // 2^(nbits-1) < mant <= 2^nbits if mant > 0

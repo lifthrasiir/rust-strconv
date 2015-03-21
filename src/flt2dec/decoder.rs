@@ -1,31 +1,47 @@
+//! Decodes a floating-point value into individual parts and error ranges.
+
 use core::{f32, f64};
 use core::num::{Float, FpCategory};
 use core::any::TypeId;
 
+/// Decoded unsigned finite value, such that:
+///
+/// - The original value equals to `mant * 2^exp`.
+///
+/// - Any number from `(mant - minus) * 2^exp` to `(mant + plus) * 2^exp` will
+///   round to the original value. The range is inclusive only when
+///   `inclusive` is true.
 #[derive(Copy, Debug, PartialEq)]
 pub struct Decoded {
-    // the scaled mantissa. `original value = mant * 2^exp`.
+    /// The scaled mantissa.
     pub mant: u64,
-    // the lower and upper bounds of ulps.
-    // any number between `(mant - minus) * 2^exp` and `(mant + plus) * 2^exp`
-    // should have rounded to `mant`. (bounds included only when `inclusive` is true)
+    /// The lower error range.
     pub minus: u64,
+    /// The upper error range.
     pub plus: u64,
-    // shared exponent in base 2.
+    /// The shared exponent in base 2.
     pub exp: i16,
-    // are the ulp bounds inclusive?
-    pub inclusive: bool, // in IEEE 754, this is true when the original mantissa was even
+    /// True when the error range is inclusive.
+    ///
+    /// In IEEE 754, this is true when the original mantissa was even.
+    pub inclusive: bool,
 }
 
+/// Decoded unsigned value.
 #[derive(Copy, Debug, PartialEq)]
 pub enum FullDecoded {
+    /// Not-a-number.
     Nan,
+    /// Infinities, either positive or negative.
     Infinite,
+    /// Zero, either positive or negative.
     Zero,
+    /// Finite numbers with further decoded fields.
     Finite(Decoded),
 }
 
-// Float::integer_decode always preserves the exponent, so the mantissa is scaled for subnormals
+/// Returns a sign (true when negative) and `FullDecoded` value
+/// from given floating point number.
 pub fn decode<T: Float + 'static>(v: T) -> (/*negative?*/ bool, FullDecoded) {
     let (mant, exp, sign) = v.integer_decode();
     let even = (mant & 1) == 0;
@@ -35,6 +51,8 @@ pub fn decode<T: Float + 'static>(v: T) -> (/*negative?*/ bool, FullDecoded) {
         FpCategory::Zero => FullDecoded::Zero,
         FpCategory::Subnormal => {
             // (mant - 2, exp) -- (mant, exp) -- (mant + 2, exp)
+            // Float::integer_decode always preserves the exponent,
+            // so the mantissa is scaled for subnormals.
             FullDecoded::Finite(Decoded { mant: mant, minus: 1, plus: 1,
                                           exp: exp, inclusive: even })
         }

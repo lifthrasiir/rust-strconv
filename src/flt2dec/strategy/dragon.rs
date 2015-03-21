@@ -67,6 +67,7 @@ fn div_rem_upto_16<'a>(x: &'a mut Big, scale: &Big,
     (d, x)
 }
 
+/// The shortest mode implementation for Dragon.
 pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ i16) {
     // the number `v` to format is known to be:
     // - equal to `mant * 2^exp`;
@@ -216,6 +217,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     (i, k)
 }
 
+/// The exact and fixed mode implementation for Dragon.
 pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usize, /*exp*/ i16) {
     assert!(d.mant > 0);
     assert!(d.minus > 0);

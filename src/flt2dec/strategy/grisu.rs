@@ -11,11 +11,18 @@ use core::num::{Int, Float};
 
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 
+/// A custom 64-bit floating point type, representing `f * 2^e`.
 #[derive(Copy, Debug)]
 #[doc(hidden)]
-pub struct Fp { pub f: u64, pub e: i16 }
+pub struct Fp {
+    /// The integer mantissa.
+    pub f: u64,
+    /// The exponent in base 2.
+    pub e: i16,
+}
 
 impl Fp {
+    /// Returns a correctly rounded product of itself and `other`.
     fn mul(&self, other: &Fp) -> Fp {
         const MASK: u64 = 0xffffffff;
         let a = self.f >> 32;
@@ -32,6 +39,7 @@ impl Fp {
         Fp { f: f, e: e }
     }
 
+    /// Normalizes itself so that the resulting mantissa is at least `2^63`.
     fn normalize(&self) -> Fp {
         let mut f = self.f;
         let mut e = self.e;
@@ -45,6 +53,8 @@ impl Fp {
         Fp { f: f, e: e }
     }
 
+    /// Normalizes itself to have the shared exponent.
+    /// It can only decrease the exponent (and thus increase the mantissa).
     fn normalize_to(&self, e: i16) -> Fp {
         let edelta = self.e - e;
         assert!(edelta >= 0);
@@ -167,7 +177,7 @@ pub fn cached_power(alpha: i16, gamma: i16) -> (i16, Fp) {
     (k, Fp { f: f, e: e })
 }
 
-// given `x > 0`, `max_pow10_no_more_than(x) = (k, 10^k)` such that `10^k <= x < 10^(k+1)`.
+/// Given `x > 0`, returns `(k, 10^k)` such that `10^k <= x < 10^(k+1)`.
 #[doc(hidden)]
 pub fn max_pow10_no_more_than(x: u32) -> (u8, u32) {
     debug_assert!(x > 0);
@@ -192,6 +202,9 @@ pub fn max_pow10_no_more_than(x: u32) -> (u8, u32) {
     }
 }
 
+/// The shortest mode implementation for Grisu.
+///
+/// It returns `None` when it would return an inexact representation otherwise.
 pub fn format_shortest_opt(d: &Decoded,
                            buf: &mut [u8]) -> Option<(/*#digits*/ usize, /*exp*/ i16)> {
     assert!(d.mant > 0);
@@ -456,6 +469,9 @@ pub fn format_shortest_opt(d: &Decoded,
     }
 }
 
+/// The shortest mode implementation for Grisu with Dragon fallback.
+///
+/// This should be used for most cases.
 pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp*/ i16) {
     use flt2dec::strategy::dragon::format_shortest as fallback;
     match format_shortest_opt(d, buf) {
@@ -464,6 +480,9 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     }
 }
 
+/// The exact and fixed mode implementation for Grisu.
+///
+/// It returns `None` when it would return an inexact representation otherwise.
 pub fn format_exact_opt(d: &Decoded, buf: &mut [u8], limit: i16)
                                 -> Option<(/*#digits*/ usize, /*exp*/ i16)> {
     assert!(d.mant > 0);
@@ -707,6 +726,9 @@ pub fn format_exact_opt(d: &Decoded, buf: &mut [u8], limit: i16)
     }
 }
 
+/// The exact and fixed mode implementation for Grisu with Dragon fallback.
+///
+/// This should be used for most cases.
 pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usize, /*exp*/ i16) {
     use flt2dec::strategy::dragon::format_exact as fallback;
     match format_exact_opt(d, buf, limit) {

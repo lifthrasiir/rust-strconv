@@ -665,6 +665,11 @@ pub fn to_shortest_exp_str_test<F>(mut f_: F)
     assert_eq!(to_string(f, 1.9971e20, Minus, (-20, 21), false), "199710000000000000000");
     assert_eq!(to_string(f, 1.9971e20, Minus, (-21, 20), false), "1.9971e20");
 
+    // the true value of 1.0e23f64 is less than 10^23, but that shouldn't matter here
+    assert_eq!(to_string(f, 1.0e23, Minus, (22, 23), false), "1e23");
+    assert_eq!(to_string(f, 1.0e23, Minus, (23, 24), false), "100000000000000000000000");
+    assert_eq!(to_string(f, 1.0e23, Minus, (24, 25), false), "1e23");
+
     assert_eq!(to_string(f, f32::MAX, Minus, ( -4, 16), false), "3.4028235e38");
     assert_eq!(to_string(f, f32::MAX, Minus, (-39, 38), false), "3.4028235e38");
     assert_eq!(to_string(f, f32::MAX, Minus, (-38, 39), false), format!("34028235{:0>31}", ""));

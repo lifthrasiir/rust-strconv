@@ -1,13 +1,36 @@
+//! Custom arbitrary-precision number (bignum) implementation.
+//!
+//! This is designed to avoid the heap allocation at expense of stack memory.
+//! The most used bignum type, `Big32x36`, is limited by 32 × 36 = 1,152 bits
+//! and will take at most 152 bytes of stack memory. This is (barely) enough
+//! for handling all possible finite `f64` values.
+//!
+//! In principle it is possible to have multiple bignum types for different
+//! inputs, but we don't do so to avoid the code bloat. Each bignum is still
+//! tracked for the actual usages, so it normally doesn't matter.
+
 #![macro_use]
 
 use core::prelude::*;
 use core::mem;
 use core::intrinsics;
 
+/// Arithmetic operations required by bignums.
 pub trait FullOps {
+    /// Returns `(carry', v')` such that `carry' * 2^W + v' = self + other + carry`,
+    /// where `W` is the number of bits in `Self`.
     fn full_add(self, other: Self, carry: bool) -> (bool /*carry*/, Self);
+
+    /// Returns `(carry', v')` such that `carry' * 2^W + v' = self * other + carry`,
+    /// where `W` is the number of bits in `Self`.
     fn full_mul(self, other: Self, carry: Self) -> (Self /*carry*/, Self);
+
+    /// Returns `(carry', v')` such that `carry' * 2^W + v' = self * other + other2 + carry`,
+    /// where `W` is the number of bits in `Self`.
     fn full_mul_add(self, other: Self, other2: Self, carry: Self) -> (Self /*carry*/, Self);
+
+    /// Returns `(quo, rem)` such that `borrow * 2^W + self = quo * other + rem`
+    /// and `0 <= rem < other`, where `W` is the number of bits in `Self`.
     fn full_div_rem(self, other: Self, borrow: Self) -> (Self /*quotient*/, Self /*remainder*/);
 }
 
@@ -15,7 +38,6 @@ macro_rules! impl_full_ops {
     ($($ty:ty: add($addfn:path), mul/div($bigty:ident);)*) => (
         $(
             impl FullOps for $ty {
-                // carry' || v' <- self + other + carry
                 fn full_add(self, other: $ty, carry: bool) -> (bool, $ty) {
                     // this cannot overflow, the output is between 0 and 2*2^nbits - 1
                     // XXX will LLVM optimize this into ADC or similar???
@@ -24,7 +46,6 @@ macro_rules! impl_full_ops {
                     (carry1 || carry2, v)
                 }
 
-                // carry' || v' <- self * other + carry
                 fn full_mul(self, other: $ty, carry: $ty) -> ($ty, $ty) {
                     // this cannot overflow, the output is between 0 and 2^nbits * (2^nbits - 1)
                     let nbits = mem::size_of::<$ty>() * 8;
@@ -32,7 +53,6 @@ macro_rules! impl_full_ops {
                     ((v >> nbits) as $ty, v as $ty)
                 }
 
-                // carry' || v' <- self * other + other2 + carry
                 fn full_mul_add(self, other: $ty, other2: $ty, carry: $ty) -> ($ty, $ty) {
                     // this cannot overflow, the output is between 0 and 2^(2*nbits) - 1
                     let nbits = mem::size_of::<$ty>() * 8;
@@ -41,7 +61,6 @@ macro_rules! impl_full_ops {
                     ((v >> nbits) as $ty, v as $ty)
                 }
 
-                // (quo, rem) <- (borrow || self) /% other
                 fn full_div_rem(self, other: $ty, borrow: $ty) -> ($ty, $ty) {
                     debug_assert!(borrow < other);
                     // this cannot overflow, the dividend is between 0 and other * 2^nbits - 1
@@ -64,19 +83,33 @@ impl_full_ops! {
 
 macro_rules! define_bignum {
     ($name:ident: type=$ty:ty, n=$n:expr) => (
-        #[derive(Copy)]
+        /// Stack-allocated arbitrary-precision (up to certain limit) integer.
+        ///
+        /// This is backed by an fixed-size array of given type ("digit").
+        /// While the array is not very large (normally some hundred bytes),
+        /// copying it recklessly may result in the performance hit.
+        /// Thus this is intentionally not `Copy`.
+        ///
+        /// All operations available to bignums panic in the case of over/underflows.
+        /// The caller is responsible to use large enough bignum types.
         pub struct $name {
-            size: usize, // base[size..] is known to be zero
-            base: [$ty; $n] // [a, b, c, ...] represents a + b*n + c*n^2 + ...
+            /// One plus the offset to the maximum "digit" in the use.
+            /// This does not decrease, so be aware of the computation order.
+            /// `base[size..]` should be zero.
+            size: usize,
+            /// Digits. `[a, b, c, ...]` represents `a + b*n + c*n^2 + ...`.
+            base: [$ty; $n]
         }
 
         impl $name {
+            /// Makes a bignum from one digit.
             pub fn from_small(v: $ty) -> $name {
                 let mut base = [0; $n];
                 base[0] = v;
                 $name { size: 1, base: base }
             }
 
+            /// Makes a bignum from `u64` value.
             pub fn from_u64(mut v: u64) -> $name {
                 use core::mem;
 
@@ -90,10 +123,12 @@ macro_rules! define_bignum {
                 $name { size: sz, base: base }
             }
 
+            /// Returns true if the bignum is zero.
             pub fn is_zero(&self) -> bool {
                 self.base[..self.size].iter().all(|&v| v == 0)
             }
 
+            /// Adds `other` to itself and returns its own mutable reference.
             pub fn add<'a>(&'a mut self, other: &$name) -> &'a mut $name {
                 use core::cmp;
                 use flt2dec::bignum::FullOps;
@@ -113,6 +148,7 @@ macro_rules! define_bignum {
                 self
             }
 
+            /// Subtracts `other` from itself and returns its own mutable reference.
             pub fn sub<'a>(&'a mut self, other: &$name) -> &'a mut $name {
                 use core::cmp;
                 use flt2dec::bignum::FullOps;
@@ -129,6 +165,8 @@ macro_rules! define_bignum {
                 self
             }
 
+            /// Multiplies itself by a digit-sized `other` and returns its own
+            /// mutable reference.
             pub fn mul_small<'a>(&'a mut self, other: $ty) -> &'a mut $name {
                 use flt2dec::bignum::FullOps;
 
@@ -147,6 +185,7 @@ macro_rules! define_bignum {
                 self
             }
 
+            /// Multiplies itself by `2^bits` and returns its own mutable reference.
             pub fn mul_pow2<'a>(&'a mut self, bits: usize) -> &'a mut $name {
                 use core::mem;
 
@@ -187,6 +226,8 @@ macro_rules! define_bignum {
                 self
             }
 
+            /// Multiplies itself by a number described by `other[0] + other[1] * n +
+            /// other[2] * n^2 + ...` and returns its own mutable reference.
             pub fn mul_digits<'a>(&'a mut self, other: &[$ty]) -> &'a mut $name {
                 // the internal routine. works best when aa.len() <= bb.len().
                 fn mul_inner(ret: &mut [$ty; $n], aa: &[$ty], bb: &[$ty]) -> usize {
@@ -224,6 +265,8 @@ macro_rules! define_bignum {
                 self
             }
 
+            /// Divides itself by a digit-sized `other` and returns its own
+            /// mutable reference *and* the remainder.
             pub fn div_rem_small<'a>(&'a mut self, other: $ty) -> (&'a mut $name, $ty) {
                 use flt2dec::bignum::FullOps;
 
@@ -288,6 +331,8 @@ macro_rules! define_bignum {
     )
 }
 
+/// The digit type for `Big32x36`.
 pub type Digit32 = u32;
+
 define_bignum!(Big32x36: type=Digit32, n=36);
 

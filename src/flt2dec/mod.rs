@@ -1,3 +1,117 @@
+/*!
+
+Floating-point number to decimal conversion routines.
+
+# Problem statement
+
+We are given the floating-point number `v = f * 2^e` with an integer `f`,
+and its bounds `minus` and `plus` such that any number between `v - minus` and
+`v + plus` will be rounded to `v`. For the simplicity we assume that
+this range is exclusive. Then we would like to get the unique decimal
+representation `V = 0.d[0..n-1] * 10^k` such that:
+
+- `d[0]` is non-zero.
+
+- It's correctly rounded when parsed back: `v - minus < V < v + plus`.
+  Furthermore it is shortest such one, i.e. there is no representation
+  with less than `n` digits that is correctly rounded.
+
+- It's closest to the original value: `abs(V - v) <= 10^(k-n) / 2`. Note that
+  there might be two representations satisfying this uniqueness requirement,
+  in which case some tie-breaking mechanism is used.
+
+We will call this mode of operation as to the *shortest* mode. This mode is used
+when there is no additional constraint, and can be thought as a "natural" mode
+as it matches the ordinary intuition (it at least prints `0.1f32` as "0.1").
+
+We have two more modes of operation closely related to each other. In these modes
+we are given either the number of significant digits `n` or the last-digit
+limitation `limit` (which determines the actual `n`), and we would like to get
+the representation `V = 0.d[0..n-1] * 10^k` such that:
+
+- `d[0]` is non-zero, unless `n` was zero in which case only `k` is returned.
+
+- It's closest to the original value: `abs(V - v) <= 10^(k-n) / 2`. Again,
+  there might be some tie-breaking mechanism.
+
+When `limit` is given but not `n`, we set `n` such that `k - n = limit`
+so that the last digit `d[n-1]` is scaled by `10^(k-n) = 10^limit`.
+If such `n` is negative, we clip it to zero so that we will only get `k`.
+We are also limited by the supplied buffer. This limitation is used to print
+the number up to given number of fractional digits without knowing
+the correct `k` beforehand.
+
+We will call the mode of operation requiring `n` as to the *exact* mode,
+and one requiring `limit` as to the *fixed* mode. The exact mode is a subset of
+the fixed mode: the sufficiently large last-digit limitation will eventually fill
+the supplied buffer and let the algorithm to return.
+
+# Implementation overview
+
+It is easy to get the floating point printing correct but slow (Russ Cox has
+[demonstrated](http://research.swtch.com/ftoa) how it's easy), or incorrect but
+fast (naïve division and modulo). But it is surprisingly hard to print
+floating point numbers correctly *and* efficiently.
+
+There are two classes of algorithms widely known to be correct.
+
+- The "Dragon" family of algorithm is first described by Guy L. Steele Jr. and
+  Jon L. White. They rely on the fixed-size big integer for their correctness.
+  A slight improvement was found later, which is posthumously described by
+  Robert G. Burger and R. Kent Dybvig. David Gay's `dtoa.c` routine is
+  a popular implementation of this strategy.
+
+- The "Grisu" family of algorithm is first described by Florian Loitsch.
+  They use very cheap integer-only procedure to determine the close-to-correct
+  representation which is at least guaranteed to be shortest. The variant,
+  Grisu3, actively detects if the resulting representation is incorrect.
+
+We implement both algorithms with necessary tweaks to suit our requirements.
+In particular, published literatures are short of the actual implementation
+difficulties like how to avoid arithmetic overflows. Each implementation,
+available in `strategy::dragon` and `strategy::grisu` respectively,
+extensively describes all necessary justifications and many proofs for them.
+(It is still difficult to follow though. You have been warned.)
+
+Both implementations expose two public functions:
+
+- `format_shortest(decoded, buf)`, which always need at least
+  `MAX_SIG_DIGITS` digits of buffer. Implements the shortest mode.
+
+- `format_exact(decoded, buf, limit)`, which accepts as small as
+  one digit of buffer. Implements exact and fixed modes.
+
+They try to fill the `u8` buffer with digits and returns the number of digits
+written and the exponent `k`. They are total for all finite `f32` and `f64`
+inputs (Grisu internally falls back to Dragon if possible).
+
+The rendered digits are formatted into the actual string form with
+four functions:
+
+- `to_shortest_str` prints the shortest representation, which can be padded by
+  zeroes to make *at least* given number of fractional digits.
+
+- `to_shortest_exp_str` prints the shortest representation, which can be
+  padded by zeroes when its exponent is in the specified ranges,
+  or can be printed in the exponential form such as `1.23e45`.
+
+- `to_exact_exp_str` prints the exact representation with given number of
+  digits in the exponential form.
+
+- `to_exact_fixed_str` prints the fixed representation with *exactly*
+  given number of fractional digits.
+
+They all return a slice of preallocated `Part` array, which corresponds to
+the individual part of strings: a fixed string, a part of rendered digits,
+a number of zeroes or a small (`u16`) number. The caller is expected to
+provide an enough buffer and `Part` array, and to assemble the final
+string from parts itself.
+
+All algorithms and formatting functions are accompanied by extensive tests
+in the `tests` module. It also shows how to use individual functions.
+
+*/
+
 use core::prelude::*;
 use core::i16;
 use core::num::Float;
@@ -7,6 +121,7 @@ pub mod estimator;
 pub mod bignum;
 pub mod decoder;
 
+/// Digit-generation algorithms.
 pub mod strategy {
     pub mod dragon;
     pub mod grisu;
@@ -14,13 +129,15 @@ pub mod strategy {
 
 #[cfg(test)] mod tests;
 
-// it is a bit non-trivial to derive, but this is one plus the maximal number of
-// significant decimal digits from formatting algorithms with the shortest result.
-// the exact formula for this is: ceil(# bits in mantissa * log_10 2 + 1).
+/// The minimum size of buffer necessary for the shortest mode.
+///
+/// It is a bit non-trivial to derive, but this is one plus the maximal number of
+/// significant decimal digits from formatting algorithms with the shortest result.
+/// The exact formula is `ceil(# bits in mantissa * log_10 2 + 1)`.
 pub const MAX_SIG_DIGITS: usize = 17;
 
-// when d[..n] contains decimal digits, increase the last digit and propagate carry.
-// returns true when it causes the length change.
+/// When d[..n] contains decimal digits, increase the last digit and propagate carry.
+/// Returns a next digit when it causes the length change.
 fn round_up(d: &mut [u8], n: usize) -> Option<u8> {
     match d[..n].iter().rposition(|&c| c != b'9') {
         Some(i) => { // d[i+1..n] is all nines
@@ -39,14 +156,19 @@ fn round_up(d: &mut [u8], n: usize) -> Option<u8> {
     }
 }
 
+/// Formatted parts.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Part<'a> {
+    /// Given number of zero digits.
     Zero(usize),
+    /// A literal number up to 5 digits.
     Num(u16),
+    /// A verbatim copy of given bytes.
     Copy(&'a [u8]),
 }
 
 impl<'a> Part<'a> {
+    /// Returns the exact byte length of given part.
     pub fn len(&self) -> usize {
         match *self {
             Part::Copy(buf) => buf.len(),
@@ -57,6 +179,14 @@ impl<'a> Part<'a> {
     }
 }
 
+/// Formats given decimal digits `0.<...buf...> * 10^exp` into the decimal form
+/// with at least given number of fractional digits. The result is stored to
+/// the supplied parts array and the number of parts written is returned.
+///
+/// `frac_digits` can be less than the number of actual fractional digits in `buf`;
+/// it will be ignored and full digits will be printed. It is only used to print
+/// additional zeroes after rendered digits. Thus `frac_digits` of 0 means that
+/// it will only print given digits and nothing else.
 fn digits_to_dec_str<'a>(buf: &'a [u8], exp: i16, frac_digits: usize,
                          parts: &mut [Part<'a>]) -> usize {
     assert!(!buf.is_empty());
@@ -102,7 +232,7 @@ fn digits_to_dec_str<'a>(buf: &'a [u8], exp: i16, frac_digits: usize,
                 3
             }
         } else {
-            // the decimal point is after rendered digits: [1234____0000] or [1234][__][.][__].
+            // the decimal point is after rendered digits: [1234][____0000] or [1234][__][.][__].
             parts[0] = Part::Copy(buf);
             parts[1] = Part::Zero(exp - buf.len());
             if frac_digits > 0 {
@@ -116,6 +246,15 @@ fn digits_to_dec_str<'a>(buf: &'a [u8], exp: i16, frac_digits: usize,
     }
 }
 
+/// Formats given decimal digits `0.<...buf...> * 10^exp` into the exponential form
+/// with at least given number of significant digits. When `upper` is true,
+/// the exponent will be prefixed by `E`; otherwise that's `e`. The result is
+/// stored to the supplied parts array and the number of parts written is returned.
+///
+/// `min_digits` can be less than the number of actual significant digits in `buf`;
+/// it will be ignored and full digits will be printed. It is only used to print
+/// additional zeroes after rendered digits. Thus `min_digits` of 0 means that
+/// it will only print given digits and nothing else.
 fn digits_to_exp_str<'a>(buf: &'a [u8], exp: i16, min_ndigits: usize, upper: bool,
                          parts: &mut [Part<'a>]) -> usize {
     assert!(!buf.is_empty());
@@ -150,13 +289,19 @@ fn digits_to_exp_str<'a>(buf: &'a [u8], exp: i16, min_ndigits: usize, upper: boo
     }
 }
 
+/// Sign formatting modes.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Sign {
+    /// Prints `-` only for the negative non-zero values.
     Minus,        // -1  0  0  1
+    /// Prints `-` for the negative non-zero values, or `+` otherwise.
     MinusPlus,    // -1 +0 +0 +1
+    /// Prints `-` for any negative values (including the negative zero),
+    /// or `+` otherwise. It treats all NaN as positives though.
     MinusPlusRaw, // -1 -0 +0 +1
 }
 
+/// Returns the part corresponding to the sign to be formatted, if any.
 fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> Option<Part<'static>> {
     const PLUS:  Part<'static> = Part::Copy(b"+");
     const MINUS: Part<'static> = Part::Copy(b"-");
@@ -174,6 +319,23 @@ fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> Option<P
     }
 }
 
+/// Formats given floating point number into the decimal form with at least
+/// given number of fractional digits. The result is stored to the supplied parts
+/// array while utilizing given byte buffer as a scratch, and the number of
+/// parts written is returned. `upper` is only used to determine the case of
+/// non-finite values, i.e. `inf` and `nan`.
+///
+/// `format_shortest` should be the underlying digit-generation function.
+/// You probably would want `strategy::grisu::format_shortest` for this.
+///
+/// `frac_digits` can be less than the number of actual fractional digits in `v`;
+/// it will be ignored and full digits will be printed. It is only used to print
+/// additional zeroes after rendered digits. Thus `frac_digits` of 0 means that
+/// it will only print given digits and nothing else.
+///
+/// The byte buffer should be at least `MAX_SIG_DIGITS` bytes long.
+/// There should be at least 5 parts available, due to the worst case like
+/// `[+][0.][0000][45][0000]` with `frac_digits = 10`.
 pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
                                  sign: Sign, frac_digits: usize, upper: bool,
                                  buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
@@ -214,7 +376,24 @@ pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
     }
 }
 
-// dec_bounds == (min, max) s.t. 10^min <= v < 10^max will be rendered as decimal
+/// Formats given floating point number into the decimal form or
+/// the exponential form, depending on the resulting exponent. The result is
+/// stored to the supplied parts array while utilizing given byte buffer
+/// as a scratch, and the number of parts written is returned.
+/// `upper` is used to determine the case of non-finite values (`inf` and `nan`)
+/// or the case of the exponent prefix (`e` or `E`).
+///
+/// `format_shortest` should be the underlying digit-generation function.
+/// You probably would want `strategy::grisu::format_shortest` for this.
+///
+/// The `dec_bounds` is a tuple `(lo, hi)` such that the number is formatted
+/// as decimal only when `10^lo <= V < 10^hi`. Note that this is the *apparant* `V`
+/// instead of the actual `v`! Thus any printed exponent in the exponential form
+/// cannot be in this range, avoiding any confusion.
+///
+/// The byte buffer should be at least `MAX_SIG_DIGITS` bytes long.
+/// There should be at least 7 parts available, due to the worst case like
+/// `[+][1][.][2345][e][-][67]`.
 pub fn to_shortest_exp_str<'a, T, F>(mut format_shortest: F, v: T,
                                      sign: Sign, dec_bounds: (i16, i16), upper: bool,
                                      buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
@@ -259,29 +438,44 @@ pub fn to_shortest_exp_str<'a, T, F>(mut format_shortest: F, v: T,
     }
 }
 
-// rather crude approximation (upper bound) for the maximum buffer size
-// calculated from the given `decoded.exp`.
-//
-// the exact limit is:
-// - when `exp < 0`, the maximum length is `ceil(log_10 (5^-exp * (2^64 - 1)))`
-// - when `exp >= 0`, the maximum length is `ceil(log_10 (2^exp * (2^64 - 1)))`
-//
-// `ceil(log_10 (x^exp * (2^64 - 1)))` is less than `ceil(log_10 (2^64 - 1)) +
-// ceil(exp * log_10 x)`, which is in turn less than `20 + (1 + exp * log_10 x)`.
-// we use the facts that `log_10 2 < 5/16` and `log_10 5 < 12/16`, which is
-// enough for our purposes.
-//
-// why do we need this? `format_exact` functions will fill the entire buffer
-// unless limited by the last digit restriction, but it is possible that
-// the number of digits requested is ridiculously large (say, 30,000 digits).
-// the vast majority of buffer will be filled with zeroes, so we don't want to
-// allocate all the buffer beforehand. consequently, for any given arguments,
-// 826 bytes of buffer should be sufficient for `f64`. compare this with
-// the actual number for the worst case: 770 bytes (when `exp = -1074`).
+/// Returns rather crude approximation (upper bound) for the maximum buffer size
+/// calculated from the given decoded exponent.
+///
+/// The exact limit is:
+///
+/// - when `exp < 0`, the maximum length is `ceil(log_10 (5^-exp * (2^64 - 1)))`.
+/// - when `exp >= 0`, the maximum length is `ceil(log_10 (2^exp * (2^64 - 1)))`.
+///
+/// `ceil(log_10 (x^exp * (2^64 - 1)))` is less than `ceil(log_10 (2^64 - 1)) +
+/// ceil(exp * log_10 x)`, which is in turn less than `20 + (1 + exp * log_10 x)`.
+/// We use the facts that `log_10 2 < 5/16` and `log_10 5 < 12/16`, which is
+/// enough for our purposes.
+///
+/// Why do we need this? `format_exact` functions will fill the entire buffer
+/// unless limited by the last digit restriction, but it is possible that
+/// the number of digits requested is ridiculously large (say, 30,000 digits).
+/// The vast majority of buffer will be filled with zeroes, so we don't want to
+/// allocate all the buffer beforehand. Consequently, for any given arguments,
+/// 826 bytes of buffer should be sufficient for `f64`. Compare this with
+/// the actual number for the worst case: 770 bytes (when `exp = -1074`).
 fn estimate_max_buf_len(exp: i16) -> usize {
     21 + ((if exp < 0 { -12 } else { 5 } * exp as i32) as usize >> 4)
 }
 
+/// Formats given floating point number into the exponential form with
+/// exactly given number of significant digits. The result is stored to
+/// the supplied parts array while utilizing given byte buffer as a scratch,
+/// and the number of parts written is returned. `upper` is used to
+/// determine the case of the exponent prefix (`e` or `E`).
+///
+/// `format_exact` should be the underlying digit-generation function.
+/// You probably would want `strategy::grisu::format_exact` for this.
+///
+/// The byte buffer should be at least `ndigits` bytes long unless `ndigits` is
+/// so large that only the fixed number of digits will be ever written.
+/// (The tipping point for `f64` is about 800, so 1000 bytes should be enough.)
+/// There should be at least 7 parts available, due to the worst case like
+/// `[+][1][.][2345][e][-][67]`.
 pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
                                   sign: Sign, ndigits: usize, upper: bool,
                                   buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
@@ -327,12 +521,26 @@ pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
     }
 }
 
+/// Formats given floating point number into the decimal form with exactly
+/// given number of fractional digits. The result is stored to the supplied parts
+/// array while utilizing given byte buffer as a scratch, and the number of
+/// parts written is returned. `upper` is only used to determine the case of
+/// non-finite values, i.e. `inf` and `nan`.
+///
+/// `format_exact` should be the underlying digit-generation function.
+/// You probably would want `strategy::grisu::format_exact` for this.
+///
+/// The byte buffer should be enough for the output unless `frac_digits` is
+/// so large that only the fixed number of digits will be ever written.
+/// (The tipping point for `f64` is about 800, and 1000 bytes should be enough.)
+/// There should be at least 5 parts available, due to the worst case like
+/// `[+][0.][0000][45][0000]` with `frac_digits = 10`.
 pub fn to_exact_fixed_str<'a, T, F>(mut format_exact: F, v: T,
                                     sign: Sign, frac_digits: usize, upper: bool,
                                     buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
         where T: Float + 'static,
               F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
-    assert!(parts.len() >= 6);
+    assert!(parts.len() >= 5);
 
     let (negative, full_decoded) = decode(v);
     let mut n = 0;
