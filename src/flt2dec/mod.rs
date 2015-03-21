@@ -2,9 +2,8 @@ use std::i16;
 use std::num::{Float, FpCategory};
 pub use self::decoder::{decode, Decoded};
 
-mod intrin;
 mod estimator;
-#[macro_use] mod bignum;
+mod bignum;
 mod decoder;
 
 #[cfg(test)] mod testing;

@@ -1,5 +1,5 @@
-use std::mem;
-use super::intrin;
+use core::mem;
+use core::intrinsics;
 
 pub trait FullOps {
     fn full_add(self, other: Self, carry: bool) -> (bool /*carry*/, Self);
@@ -9,15 +9,15 @@ pub trait FullOps {
 }
 
 macro_rules! impl_full_ops {
-    ($($ty:ty: add($addfn:ident), mul/div($bigty:ident);)*) => (
+    ($($ty:ty: add($addfn:path), mul/div($bigty:ident);)*) => (
         $(
             impl FullOps for $ty {
                 // carry' || v' <- self + other + carry
                 fn full_add(self, other: $ty, carry: bool) -> (bool, $ty) {
                     // this cannot overflow, the output is between 0 and 2*2^nbits - 1
                     // XXX will LLVM optimize this into ADC or similar???
-                    let (v, carry1) = intrin::$addfn(self, other);
-                    let (v, carry2) = intrin::$addfn(v, if carry {1} else {0});
+                    let (v, carry1) = unsafe { $addfn(self, other) };
+                    let (v, carry2) = unsafe { $addfn(v, if carry {1} else {0}) };
                     (carry1 || carry2, v)
                 }
 
@@ -53,10 +53,10 @@ macro_rules! impl_full_ops {
 }
 
 impl_full_ops! {
-    u8:  add(u8_add_with_overflow),  mul/div(u16);
-    u16: add(u16_add_with_overflow), mul/div(u32);
-    u32: add(u32_add_with_overflow), mul/div(u64);
-//  u64: add(u64_add_with_overflow), mul/div(u128); // damn!
+    u8:  add(intrinsics::u8_add_with_overflow),  mul/div(u16);
+    u16: add(intrinsics::u16_add_with_overflow), mul/div(u32);
+    u32: add(intrinsics::u32_add_with_overflow), mul/div(u64);
+//  u64: add(intrinsics::u64_add_with_overflow), mul/div(u128); // damn!
 }
 
 macro_rules! define_bignum {

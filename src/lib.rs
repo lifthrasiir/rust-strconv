@@ -21,6 +21,7 @@
 #![feature(core, std_misc)] // lib stability features as per RFC #507
 #![cfg_attr(test, feature(libc, test))] // ditto
 
+extern crate core;
 #[cfg(test)] extern crate test;
 #[cfg(test)] extern crate rand;
 
