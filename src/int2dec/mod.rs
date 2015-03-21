@@ -1,5 +1,5 @@
-use std::{str, fmt};
-use std::num::Int;
+use core::{str, fmt};
+use core::num::Int;
 #[cfg(test)] use test;
 
 pub use self::digits::Digit;

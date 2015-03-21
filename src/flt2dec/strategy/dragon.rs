@@ -5,9 +5,8 @@ almost direct (but slightly optimized) Rust translation of Figure 3 of [1].
     quickly and accurately. SIGPLAN Not. 31, 5 (May. 1996), 108-116.
 */
 
-use std::num::{Int, Float};
-use std::cmp::Ordering::{Greater, Equal};
-#[cfg(test)] use test;
+use core::num::{Int, Float};
+use core::cmp::Ordering;
 
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 use flt2dec::estimator::estimate_scaling_factor;
@@ -97,7 +96,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     assert!(buf.len() >= MAX_SIG_DIGITS);
 
     // `a.cmp(&b) < rounding` is `if d.inclusive {a <= b} else {a < b}`
-    let rounding = if d.inclusive {Greater} else {Equal};
+    let rounding = if d.inclusive {Ordering::Greater} else {Ordering::Equal};
 
     // estimate `k_0` from original inputs satisfying `10^(k_0-1) < high <= 10^(k_0+1)`.
     // the tight bound `k` satisfying `10^(k-1) < high <= 10^k` is calculated later.
@@ -337,56 +336,56 @@ fn exact_sanity_test() {
 }
 
 #[cfg(test)] #[bench]
-fn bench_small_shortest(b: &mut test::Bencher) {
+fn bench_small_shortest(b: &mut testing::Bencher) {
     let decoded = testing::decode_finite(3.141592f64);
     let mut buf = [0; MAX_SIG_DIGITS];
     b.iter(|| format_shortest(&decoded, &mut buf));
 }
 
 #[cfg(test)] #[bench]
-fn bench_big_shortest(b: &mut test::Bencher) {
+fn bench_big_shortest(b: &mut testing::Bencher) {
     let decoded = testing::decode_finite(f64::MAX);
     let mut buf = [0; MAX_SIG_DIGITS];
     b.iter(|| format_shortest(&decoded, &mut buf));
 }
 
 #[cfg(test)] #[bench]
-fn bench_small_exact_3(b: &mut test::Bencher) {
+fn bench_small_exact_3(b: &mut testing::Bencher) {
     let decoded = testing::decode_finite(3.141592f64);
     let mut buf = [0; 3];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
-fn bench_big_exact_3(b: &mut test::Bencher) {
+fn bench_big_exact_3(b: &mut testing::Bencher) {
     let decoded = testing::decode_finite(f64::MAX);
     let mut buf = [0; 3];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
-fn bench_small_exact_12(b: &mut test::Bencher) {
+fn bench_small_exact_12(b: &mut testing::Bencher) {
     let decoded = testing::decode_finite(3.141592f64);
     let mut buf = [0; 12];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
-fn bench_big_exact_12(b: &mut test::Bencher) {
+fn bench_big_exact_12(b: &mut testing::Bencher) {
     let decoded = testing::decode_finite(f64::MAX);
     let mut buf = [0; 12];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
-fn bench_small_exact_inf(b: &mut test::Bencher) {
+fn bench_small_exact_inf(b: &mut testing::Bencher) {
     let decoded = testing::decode_finite(3.141592f64);
     let mut buf = [0; 1024];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
-fn bench_big_exact_inf(b: &mut test::Bencher) {
+fn bench_big_exact_inf(b: &mut testing::Bencher) {
     let decoded = testing::decode_finite(f64::MAX);
     let mut buf = [0; 1024];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
