@@ -13,8 +13,6 @@ use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 use flt2dec::estimator::estimate_scaling_factor;
 use flt2dec::bignum::Digit32 as Digit;
 use flt2dec::bignum::Big32x36 as Big;
-#[cfg(test)] use std::{i16, f64};
-#[cfg(test)] use flt2dec::testing;
 
 // XXX const ref to static array seems to ICE (#22540)
 static POW10: [Digit; 10] = [1, 10, 100, 1000, 10000, 100000,
@@ -34,7 +32,8 @@ static POW10TO256: [Digit; 27] =
      0xcf4a6e70, 0xd595d80f, 0x26b2716e, 0xadc666b0, 0x1d153624, 0x3c42d35a, 0x63ff540e,
      0xcc5573c0, 0x65f9ef17, 0x55bc28f2, 0x80dcc7f7, 0xf46eeddc, 0x5fdcefce, 0x553f7];
 
-fn mul_pow10(mut x: Big, n: usize) -> Big {
+#[doc(hidden)]
+pub fn mul_pow10(mut x: Big, n: usize) -> Big {
     debug_assert!(n < 512);
     if n &   7 != 0 { x = x.mul_small(POW10[n & 7]); }
     if n &   8 != 0 { x = x.mul_small(POW10[8]); }
@@ -53,16 +52,6 @@ fn div_2pow10(mut x: Big, mut n: usize) -> Big {
         n -= largest;
     }
     x.div_rem_small(TWOPOW10[n]).0
-}
-
-#[cfg(test)] #[test]
-fn test_mul_pow10() {
-    let mut prevpow10 = Big::from_small(1);
-    for i in 1..340 {
-        let curpow10 = mul_pow10(Big::from_small(1), i);
-        assert_eq!(curpow10, prevpow10.mul_small(10));
-        prevpow10 = curpow10;
-    }
 }
 
 // only usable when `x < 16 * scale`; `scaleN` should be `scale.mul_small(N)`
@@ -321,94 +310,5 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usi
     }
 
     (len, k)
-}
-
-#[cfg(test)] #[test]
-fn shortest_sanity_test() {
-    testing::f64_shortest_sanity_test(format_shortest);
-    testing::f32_shortest_sanity_test(format_shortest);
-    testing::more_shortest_sanity_test(format_shortest);
-}
-
-#[cfg(test)] #[test]
-fn exact_sanity_test() {
-    testing::f64_exact_sanity_test(format_exact);
-    testing::f32_exact_sanity_test(format_exact);
-}
-
-#[cfg(test)] #[bench]
-fn bench_small_shortest(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(3.141592f64);
-    let mut buf = [0; MAX_SIG_DIGITS];
-    b.iter(|| format_shortest(&decoded, &mut buf));
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_shortest(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(f64::MAX);
-    let mut buf = [0; MAX_SIG_DIGITS];
-    b.iter(|| format_shortest(&decoded, &mut buf));
-}
-
-#[cfg(test)] #[bench]
-fn bench_small_exact_3(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(3.141592f64);
-    let mut buf = [0; 3];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_exact_3(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(f64::MAX);
-    let mut buf = [0; 3];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_small_exact_12(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(3.141592f64);
-    let mut buf = [0; 12];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_exact_12(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(f64::MAX);
-    let mut buf = [0; 12];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_small_exact_inf(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(3.141592f64);
-    let mut buf = [0; 1024];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_exact_inf(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(f64::MAX);
-    let mut buf = [0; 1024];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[test]
-fn test_to_shortest_str() {
-    testing::to_shortest_str_test(format_shortest);
-}
-
-#[cfg(test)] #[test]
-fn test_to_shortest_exp_str() {
-    testing::to_shortest_exp_str_test(format_shortest);
-}
-
-#[cfg(test)] #[test]
-fn test_to_exact_exp_str() {
-    testing::to_exact_exp_str_test(format_exact);
-}
-
-#[cfg(test)] #[test]
-fn test_to_exact_fixed_str() {
-    testing::to_exact_fixed_str_test(format_exact);
 }
 

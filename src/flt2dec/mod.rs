@@ -3,17 +3,16 @@ use core::i16;
 use core::num::Float;
 pub use self::decoder::{decode, FullDecoded, Decoded};
 
-mod estimator;
-mod bignum;
-mod decoder;
+pub mod estimator;
+pub mod bignum;
+pub mod decoder;
 
-#[cfg(test)] mod testing;
 pub mod strategy {
-    pub mod system;
-    pub mod libc;
     pub mod dragon;
     pub mod grisu;
 }
+
+#[cfg(test)] mod tests;
 
 // it is a bit non-trivial to derive, but this is one plus the maximal number of
 // significant decimal digits from formatting algorithms with the shortest result.

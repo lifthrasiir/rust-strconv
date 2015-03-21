@@ -3,7 +3,8 @@ import sys
 import re
 
 BENCH_PATTERN = re.compile(r'''
-    ^test\ ([A-Za-z_][A-Za-z0-9_]*)::strategy::([A-Za-z_][A-Za-z0-9_]*)::bench_([A-Za-z0-9_]+)\ *
+    ^test\ ([A-Za-z_][A-Za-z0-9_]*)(?:::tests)?::strategy::
+           ([A-Za-z_][A-Za-z0-9_]*)::bench_([A-Za-z0-9_]+)\ *
     \.\.\.\ +bench:\ *([0-9]+)\ ns/iter\ \(\+/-\ ([0-9]+)\)
 ''', re.X)
 

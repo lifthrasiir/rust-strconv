@@ -30,7 +30,6 @@
 #[cfg(test)] extern crate rand;
 #[cfg(test)] extern crate libc;
 
-
 mod num;
 
 pub mod int2dec;

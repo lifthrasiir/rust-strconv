@@ -11,6 +11,15 @@ use flt2dec::{to_shortest_str, to_shortest_exp_str, to_exact_exp_str, to_exact_f
 
 pub use test::Bencher;
 
+mod estimator;
+mod bignum;
+mod strategy {
+    mod system;
+    mod libc;
+    mod dragon;
+    mod grisu;
+}
+
 pub fn decode_finite<T: Float + 'static>(v: T) -> Decoded {
     match decode(v).1 {
         FullDecoded::Finite(decoded) => decoded,

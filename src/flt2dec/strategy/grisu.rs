@@ -10,11 +10,10 @@ use core::prelude::*;
 use core::num::{Int, Float};
 
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
-#[cfg(test)] use std::{i16, f64};
-#[cfg(test)] use flt2dec::testing;
 
 #[derive(Copy, Debug)]
-struct Fp { f: u64, e: i16 }
+#[doc(hidden)]
+pub struct Fp { pub f: u64, pub e: i16 }
 
 impl Fp {
     fn mul(&self, other: &Fp) -> Fp {
@@ -56,8 +55,8 @@ impl Fp {
 }
 
 // see the comments in `format_shortest_opt` for the rationale.
-const ALPHA: i16 = -60;
-const GAMMA: i16 = -32;
+#[doc(hidden)] pub const ALPHA: i16 = -60;
+#[doc(hidden)] pub const GAMMA: i16 = -32;
 
 /*
 # the following Python code generates this table:
@@ -69,7 +68,8 @@ for i in xrange(-308, 333, 8):
     print '    (%#018x, %5d, %4d),' % (f, e, i)
 */
 // XXX const ref to static array seems to ICE (#22540)
-static CACHED_POW10: [(u64, i16, i16); 81] = [ // (f, e, k)
+#[doc(hidden)]
+pub static CACHED_POW10: [(u64, i16, i16); 81] = [ // (f, e, k)
     (0xe61acf033d1a45df, -1087, -308),
     (0xab70fe17c79ac6ca, -1060, -300),
     (0xff77b1fcbebcdc4f, -1034, -292),
@@ -153,10 +153,11 @@ static CACHED_POW10: [(u64, i16, i16); 81] = [ // (f, e, k)
     (0xeb96bf6ebadf77d9,  1039,  332),
 ];
 
-const CACHED_POW10_FIRST_E: i16 = -1087;
-const CACHED_POW10_LAST_E: i16 = 1039;
+#[doc(hidden)] pub const CACHED_POW10_FIRST_E: i16 = -1087;
+#[doc(hidden)] pub const CACHED_POW10_LAST_E: i16 = 1039;
 
-fn cached_power(alpha: i16, gamma: i16) -> (i16, Fp) {
+#[doc(hidden)]
+pub fn cached_power(alpha: i16, gamma: i16) -> (i16, Fp) {
     let offset = CACHED_POW10_FIRST_E as i32;
     let range = (CACHED_POW10.len() as i32) - 1;
     let domain = (CACHED_POW10_LAST_E - CACHED_POW10_FIRST_E) as i32;
@@ -166,22 +167,9 @@ fn cached_power(alpha: i16, gamma: i16) -> (i16, Fp) {
     (k, Fp { f: f, e: e })
 }
 
-#[cfg(test)] #[test]
-fn test_cached_power() {
-    assert_eq!(CACHED_POW10.first().unwrap().1, CACHED_POW10_FIRST_E);
-    assert_eq!(CACHED_POW10.last().unwrap().1, CACHED_POW10_LAST_E);
-
-    for e in -1137..961 { // full range for f64
-        let low = ALPHA - e - 64;
-        let high = GAMMA - e - 64;
-        let (_k, cached) = cached_power(low, high);
-        assert!(low <= cached.e && cached.e <= high,
-                "cached_power({}, {}) = {:?} is incorrect", low, high, cached);
-    }
-}
-
 // given `x > 0`, `max_pow10_no_more_than(x) = (k, 10^k)` such that `10^k <= x < 10^(k+1)`.
-fn max_pow10_no_more_than(x: u32) -> (u8, u32) {
+#[doc(hidden)]
+pub fn max_pow10_no_more_than(x: u32) -> (u8, u32) {
     debug_assert!(x > 0);
 
     const X9: u32 = 10_0000_0000;
@@ -201,17 +189,6 @@ fn max_pow10_no_more_than(x: u32) -> (u8, u32) {
         if x < X6      { if x < X5 {(4, X4)} else {(5, X5)} }
         else if x < X8 { if x < X7 {(6, X6)} else {(7, X7)} }
         else           { if x < X9 {(8, X8)} else {(9, X9)} }
-    }
-}
-
-#[cfg(test)] #[test]
-fn test_max_pow10_no_more_than() {
-    let mut prevtenk = 1;
-    for k in 1..10 {
-        let tenk = prevtenk * 10;
-        assert_eq!(max_pow10_no_more_than(tenk - 1), (k - 1, prevtenk));
-        assert_eq!(max_pow10_no_more_than(tenk), (k, tenk));
-        prevtenk = tenk;
     }
 }
 
@@ -241,7 +218,7 @@ pub fn format_shortest_opt(d: &Decoded,
     //    (this is not really avoidable, remainder is required for accuracy estimation.)
     // 2. the remainder of `floor(plus * cached)` repeatedly gets multiplied by 10,
     //    and it should not overflow.
-    // 
+    //
     // the first gives `64 + GAMMA <= 32`, while the second gives `10 * 2^-ALPHA <= 2^64`;
     // -60 and -32 is the maximal range with this constraint, and V8 also uses them.
     let (minusk, cached) = cached_power(ALPHA - plus.e - 64, GAMMA - plus.e - 64);
@@ -352,7 +329,7 @@ pub fn format_shortest_opt(d: &Decoded,
         // - `plus1frac * 10^(n-m) = d[m..n-1] * 2^e + remainder`
 
         remainder *= 10; // won't overflow, `2^e * 10 < 2^64`
-        threshold *= 10; 
+        threshold *= 10;
         ulp *= 10;
 
         // divide `remainder` by `10^kappa`.
@@ -736,141 +713,5 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usi
         Some(ret) => ret,
         None => fallback(d, buf, limit),
     }
-}
-
-#[cfg(test)] #[test]
-fn shortest_sanity_test() {
-    testing::f64_shortest_sanity_test(format_shortest);
-    testing::f32_shortest_sanity_test(format_shortest);
-    testing::more_shortest_sanity_test(format_shortest);
-}
-
-#[cfg(test)] #[test]
-fn shortest_random_equivalence_test() {
-    use flt2dec::strategy::dragon::format_shortest as fallback;
-    testing::f64_random_equivalence_test(format_shortest_opt, fallback, MAX_SIG_DIGITS, 10_000);
-    testing::f32_random_equivalence_test(format_shortest_opt, fallback, MAX_SIG_DIGITS, 10_000);
-}
-
-#[cfg(test)] #[test] #[ignore] // it is too expensive
-fn shortest_f32_exhaustive_equivalence_test() {
-    // it is hard to directly test the optimality of the output, but we can at least test if
-    // two different algorithms agree to each other.
-    //
-    // this reports the progress and the number of f32 values returned `None`.
-    // with `--nocapture` (and plenty of time and appropriate rustc flags), this should print:
-    // `done, ignored=17643160 passed=2121451879 failed=0`.
-
-    use flt2dec::strategy::dragon::format_shortest as fallback;
-    testing::f32_exhaustive_equivalence_test(format_shortest_opt, fallback, MAX_SIG_DIGITS);
-}
-
-#[cfg(test)] #[test] #[ignore] // is is too expensive
-fn shortest_f64_hard_random_equivalence_test() {
-    // this again probably has to use appropriate rustc flags.
-
-    use flt2dec::strategy::dragon::format_shortest as fallback;
-    testing::f64_random_equivalence_test(format_shortest_opt, fallback,
-                                         MAX_SIG_DIGITS, 100_000_000);
-}
-
-#[cfg(test)] #[test]
-fn exact_sanity_test() {
-    testing::f64_exact_sanity_test(format_exact);
-    testing::f32_exact_sanity_test(format_exact);
-}
-
-#[cfg(test)] #[test]
-fn exact_f32_random_equivalence_test() {
-    use flt2dec::strategy::dragon::format_exact as fallback;
-    for k in 1..21 {
-        testing::f32_random_equivalence_test(|d, buf| format_exact_opt(d, buf, i16::MIN),
-                                             |d, buf| fallback(d, buf, i16::MIN), k, 1_000);
-    }
-}
-
-#[cfg(test)] #[test]
-fn exact_f64_random_equivalence_test() {
-    use flt2dec::strategy::dragon::format_exact as fallback;
-    for k in 1..21 {
-        testing::f64_random_equivalence_test(|d, buf| format_exact_opt(d, buf, i16::MIN),
-                                             |d, buf| fallback(d, buf, i16::MIN), k, 1_000);
-    }
-}
-
-#[cfg(test)] #[bench]
-fn bench_small_shortest(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(3.141592f64);
-    let mut buf = [0; MAX_SIG_DIGITS];
-    b.iter(|| format_shortest(&decoded, &mut buf));
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_shortest(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(f64::MAX);
-    let mut buf = [0; MAX_SIG_DIGITS];
-    b.iter(|| format_shortest(&decoded, &mut buf));
-}
-
-#[cfg(test)] #[bench]
-fn bench_small_exact_3(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(3.141592f64);
-    let mut buf = [0; 3];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_exact_3(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(f64::MAX);
-    let mut buf = [0; 3];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_small_exact_12(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(3.141592f64);
-    let mut buf = [0; 12];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_exact_12(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(f64::MAX);
-    let mut buf = [0; 12];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_small_exact_inf(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(3.141592f64);
-    let mut buf = [0; 1024];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[bench]
-fn bench_big_exact_inf(b: &mut testing::Bencher) {
-    let decoded = testing::decode_finite(f64::MAX);
-    let mut buf = [0; 1024];
-    b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
-}
-
-#[cfg(test)] #[test]
-fn test_to_shortest_str() {
-    testing::to_shortest_str_test(format_shortest);
-}
-
-#[cfg(test)] #[test]
-fn test_to_shortest_exp_str() {
-    testing::to_shortest_exp_str_test(format_shortest);
-}
-
-#[cfg(test)] #[test]
-fn test_to_exact_exp_str() {
-    testing::to_exact_exp_str_test(format_exact);
-}
-
-#[cfg(test)] #[test]
-fn test_to_exact_fixed_str() {
-    testing::to_exact_fixed_str_test(format_exact);
 }
 
