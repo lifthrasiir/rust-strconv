@@ -9,11 +9,7 @@
  *    May you find forgiveness for yourself and forgive others.
  *    May you share freely, never taking more than you give.
  *
- * Alternatively, for jurisdictions where authors cannot disclaim
- * their copyright, this source code is distributed under the terms of
- * CC0 1.0 Universal license as published by Creative Commons
- * <https://creativecommons.org/publicdomain/zero/1.0/>.
- *
+ * See LICENSE.txt for the exact and precise legal mumbo-jumbo.
  * This legal notice and blessing is shamelessly adopted from
  * the SQLite library.
  */
