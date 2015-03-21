@@ -1,6 +1,7 @@
 #![cfg(test)]
 
-use std::num::Float;
+use std::prelude::v1::*;
+use std::f64;
 use test;
 
 #[bench]
@@ -10,8 +11,7 @@ fn bench_small_exact_3(b: &mut test::Bencher) {
 
 #[bench]
 fn bench_big_exact_3(b: &mut test::Bencher) {
-    let v: f64 = Float::max_value();
-    b.iter(|| format!("{:.2e}", v));
+    b.iter(|| format!("{:.2e}", f64::MAX));
 }
 
 #[bench]
@@ -21,7 +21,6 @@ fn bench_small_exact_inf(b: &mut test::Bencher) {
 
 #[bench]
 fn bench_big_exact_inf(b: &mut test::Bencher) {
-    let v: f64 = Float::max_value();
-    b.iter(|| v.to_string());
+    b.iter(|| f64::MAX.to_string());
 }
 

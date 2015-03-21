@@ -1,9 +1,8 @@
 #![cfg(test)]
 
-extern crate libc;
-
-use std::num::Float;
+use std::f64;
 use test;
+use libc;
 
 extern {
     fn snprintf(buf: *mut libc::c_char, len: libc::size_t,
@@ -25,8 +24,7 @@ fn bench_small_exact_3(b: &mut test::Bencher) {
 
 #[bench]
 fn bench_big_exact_3(b: &mut test::Bencher) {
-    let v: f64 = Float::max_value();
     let mut buf = [0; 32];
-    b.iter(|| f64_to_buf(&mut buf, "%.2e\0", v))
+    b.iter(|| f64_to_buf(&mut buf, "%.2e\0", f64::MAX))
 }
 

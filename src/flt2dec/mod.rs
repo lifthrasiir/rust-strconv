@@ -1,3 +1,4 @@
+use core::prelude::*;
 use core::i16;
 use core::num::Float;
 pub use self::decoder::{decode, FullDecoded, Decoded};

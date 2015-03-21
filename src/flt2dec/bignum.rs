@@ -1,3 +1,4 @@
+use core::prelude::*;
 use core::mem;
 use core::intrinsics;
 
@@ -75,7 +76,7 @@ macro_rules! define_bignum {
             }
 
             pub fn from_u64(mut v: u64) -> $name {
-                use std::mem;
+                use core::mem;
 
                 let mut base = [0; $n];
                 let mut sz = 0;
@@ -92,7 +93,7 @@ macro_rules! define_bignum {
             }
 
             pub fn add(mut self, other: &$name) -> $name {
-                use std::cmp;
+                use core::cmp;
                 use flt2dec::bignum::FullOps;
 
                 let mut sz = cmp::max(self.size, other.size);
@@ -111,7 +112,7 @@ macro_rules! define_bignum {
             }
 
             pub fn sub(mut self, other: &$name) -> $name {
-                use std::cmp;
+                use core::cmp;
                 use flt2dec::bignum::FullOps;
 
                 let sz = cmp::max(self.size, other.size);
@@ -145,7 +146,7 @@ macro_rules! define_bignum {
             }
 
             pub fn mul_pow2(mut self, bits: usize) -> $name {
-                use std::mem;
+                use core::mem;
 
                 let digitbits = mem::size_of::<$ty>() * 8;
                 let digits = bits / digitbits;
@@ -236,23 +237,23 @@ macro_rules! define_bignum {
             }
         }
 
-        impl PartialEq for $name {
+        impl ::core::cmp::PartialEq for $name {
             fn eq(&self, other: &$name) -> bool { self.base[..] == other.base[..] }
         }
 
-        impl Eq for $name {
+        impl ::core::cmp::Eq for $name {
         }
 
-        impl PartialOrd for $name {
-            fn partial_cmp(&self, other: &$name) -> Option<::std::cmp::Ordering> {
-                Some(self.cmp(other))
+        impl ::core::cmp::PartialOrd for $name {
+            fn partial_cmp(&self, other: &$name) -> ::core::option::Option<::core::cmp::Ordering> {
+                ::core::option::Option::Some(self.cmp(other))
             }
         }
 
-        impl Ord for $name {
-            fn cmp(&self, other: &$name) -> ::std::cmp::Ordering {
-                use std::cmp::max;
-                use std::iter::order;
+        impl ::core::cmp::Ord for $name {
+            fn cmp(&self, other: &$name) -> ::core::cmp::Ordering {
+                use core::cmp::max;
+                use core::iter::order;
 
                 let sz = max(self.size, other.size);
                 let lhs = self.base[..sz].iter().cloned().rev();
@@ -261,15 +262,15 @@ macro_rules! define_bignum {
             }
         }
 
-        impl Clone for $name {
+        impl ::core::clone::Clone for $name {
             fn clone(&self) -> $name {
                 $name { size: self.size, base: self.base }
             }
         }
 
-        impl ::std::fmt::Debug for $name {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                use std::mem;
+        impl ::core::fmt::Debug for $name {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                use core::mem;
 
                 let sz = if self.size < 1 {1} else {self.size};
                 let digitlen = mem::size_of::<$ty>() * 2;
@@ -278,7 +279,7 @@ macro_rules! define_bignum {
                 for &v in self.base[..sz-1].iter().rev() {
                     try!(write!(f, "_{:01$x}", v, digitlen));
                 }
-                Ok(())
+                ::core::result::Result::Ok(())
             }
         }
     )
@@ -289,6 +290,8 @@ define_bignum!(Big32x36: type=Digit32, n=36);
 
 #[cfg(test)]
 mod tests {
+    use std::prelude::v1::*;
+
     define_bignum!(Big: type=u8, n=3);
 
     #[test]

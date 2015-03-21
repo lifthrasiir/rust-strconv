@@ -1,3 +1,4 @@
+use core::prelude::*;
 use core::{str, fmt};
 use core::num::Int;
 #[cfg(test)] use test;
@@ -56,6 +57,7 @@ impl_uint_to_dec!(u8, Digits8, u8_to_digits);
 
 #[cfg(test)] #[test]
 fn sanity_test() {
+    use std::prelude::v1::*;
     let mut n = 1u64;
     for _ in 0..64 {
         assert_eq!((n as u64).to_string(), UintToDec(n as u64).to_string());
@@ -70,6 +72,7 @@ macro_rules! make_bench {
     ($t:ty: $system:ident vs $best:ident) => (
         #[cfg(test)] #[bench]
         fn $system(b: &mut test::Bencher) {
+            use std::prelude::v1::*;
             b.iter(|| {
                 use std::io::{Cursor, Write};
                 let mut n: $t = 1;
@@ -84,6 +87,7 @@ macro_rules! make_bench {
 
         #[cfg(test)] #[bench]
         fn $best(b: &mut test::Bencher) {
+            use std::prelude::v1::*;
             b.iter(|| {
                 use std::io::{Cursor, Write};
                 let mut n: $t = 1;

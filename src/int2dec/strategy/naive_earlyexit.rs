@@ -1,3 +1,4 @@
+use core::prelude::*;
 use num::div_rem;
 
 use int2dec::digits::{Digits64, Digits32, Digits16, Digits8};

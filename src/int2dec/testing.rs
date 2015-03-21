@@ -1,3 +1,4 @@
+use std::prelude::v1::*;
 use std::num::{Int, NumCast};
 use test;
 

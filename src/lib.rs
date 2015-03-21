@@ -18,12 +18,18 @@
  * the SQLite library.
  */
 
-#![feature(core, std_misc)] // lib stability features as per RFC #507
-#![cfg_attr(test, feature(libc, test))] // ditto
+#![feature(no_std, core)] // lib stability features as per RFC #507
+#![cfg_attr(test, feature(std_misc, libc, test))] // ditto
+#![no_std]
 
-extern crate core;
+#[macro_use] extern crate core;
+
+// tests only
+#[cfg(test)] #[macro_use] extern crate std;
 #[cfg(test)] extern crate test;
 #[cfg(test)] extern crate rand;
+#[cfg(test)] extern crate libc;
+
 
 mod num;
 

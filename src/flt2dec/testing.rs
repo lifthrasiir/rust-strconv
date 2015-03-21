@@ -1,9 +1,11 @@
+use std::prelude::v1::*;
 use std::{str, mem, i16, f32, f64, fmt};
 use core::num::Float;
 use std::num::Float as StdFloat;
 use std::slice::bytes;
 use rand;
 use rand::distributions::{IndependentSample, Range};
+
 use flt2dec::{decode, FullDecoded, Decoded, MAX_SIG_DIGITS, round_up, Part, Sign};
 use flt2dec::{to_shortest_str, to_shortest_exp_str, to_exact_exp_str, to_exact_fixed_str};
 
