@@ -1,3 +1,4 @@
+use std::prelude::v1::*;
 use std::{i16, f64};
 use super::super::*;
 use flt2dec::*;
@@ -8,8 +9,9 @@ use flt2dec::strategy::dragon::*;
 fn test_mul_pow10() {
     let mut prevpow10 = Big::from_small(1);
     for i in 1..340 {
-        let curpow10 = mul_pow10(Big::from_small(1), i);
-        assert_eq!(curpow10, prevpow10.mul_small(10));
+        let mut curpow10 = Big::from_small(1);
+        mul_pow10(&mut curpow10, i);
+        assert_eq!(curpow10, *prevpow10.clone().mul_small(10));
         prevpow10 = curpow10;
     }
 }

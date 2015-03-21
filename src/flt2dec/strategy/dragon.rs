@@ -33,35 +33,37 @@ static POW10TO256: [Digit; 27] =
      0xcc5573c0, 0x65f9ef17, 0x55bc28f2, 0x80dcc7f7, 0xf46eeddc, 0x5fdcefce, 0x553f7];
 
 #[doc(hidden)]
-pub fn mul_pow10(mut x: Big, n: usize) -> Big {
+pub fn mul_pow10<'a>(x: &'a mut Big, n: usize) -> &'a mut Big {
     debug_assert!(n < 512);
-    if n &   7 != 0 { x = x.mul_small(POW10[n & 7]); }
-    if n &   8 != 0 { x = x.mul_small(POW10[8]); }
-    if n &  16 != 0 { x = x.mul_digits(&POW10TO16); }
-    if n &  32 != 0 { x = x.mul_digits(&POW10TO32); }
-    if n &  64 != 0 { x = x.mul_digits(&POW10TO64); }
-    if n & 128 != 0 { x = x.mul_digits(&POW10TO128); }
-    if n & 256 != 0 { x = x.mul_digits(&POW10TO256); }
+    if n &   7 != 0 { x.mul_small(POW10[n & 7]); }
+    if n &   8 != 0 { x.mul_small(POW10[8]); }
+    if n &  16 != 0 { x.mul_digits(&POW10TO16); }
+    if n &  32 != 0 { x.mul_digits(&POW10TO32); }
+    if n &  64 != 0 { x.mul_digits(&POW10TO64); }
+    if n & 128 != 0 { x.mul_digits(&POW10TO128); }
+    if n & 256 != 0 { x.mul_digits(&POW10TO256); }
     x
 }
 
-fn div_2pow10(mut x: Big, mut n: usize) -> Big {
+fn div_2pow10<'a>(x: &'a mut Big, mut n: usize) -> &'a mut Big {
     let largest = POW10.len() - 1;
     while n > largest {
-        x = x.div_rem_small(POW10[largest]).0;
+        x.div_rem_small(POW10[largest]);
         n -= largest;
     }
-    x.div_rem_small(TWOPOW10[n]).0
+    x.div_rem_small(TWOPOW10[n]);
+    x
 }
 
 // only usable when `x < 16 * scale`; `scaleN` should be `scale.mul_small(N)`
-fn div_rem_upto_16(mut x: Big, scale: &Big, scale2: &Big, scale4: &Big, scale8: &Big) -> (u8, Big) {
+fn div_rem_upto_16<'a>(x: &'a mut Big, scale: &Big,
+                       scale2: &Big, scale4: &Big, scale8: &Big) -> (u8, &'a mut Big) {
     let mut d = 0;
-    if x >= *scale8 { x = x.sub(scale8); d += 8; }
-    if x >= *scale4 { x = x.sub(scale4); d += 4; }
-    if x >= *scale2 { x = x.sub(scale2); d += 2; }
-    if x >= *scale  { x = x.sub(scale);  d += 1; }
-    debug_assert!(x < *scale);
+    if *x >= *scale8 { x.sub(scale8); d += 8; }
+    if *x >= *scale4 { x.sub(scale4); d += 4; }
+    if *x >= *scale2 { x.sub(scale2); d += 2; }
+    if *x >= *scale  { x.sub(scale);  d += 1; }
+    debug_assert!(*x < *scale);
     (d, x)
 }
 
@@ -101,20 +103,20 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     let mut plus = Big::from_u64(d.plus);
     let mut scale = Big::from_small(1);
     if d.exp < 0 {
-        scale = scale.mul_pow2(-d.exp as usize);
+        scale.mul_pow2(-d.exp as usize);
     } else {
-        mant = mant.mul_pow2(d.exp as usize);
-        minus = minus.mul_pow2(d.exp as usize);
-        plus = plus.mul_pow2(d.exp as usize);
+        mant.mul_pow2(d.exp as usize);
+        minus.mul_pow2(d.exp as usize);
+        plus.mul_pow2(d.exp as usize);
     }
 
     // divide `mant` by `10^k`. now `scale / 10 < mant + plus <= scale * 10`.
     if k >= 0 {
-        scale = mul_pow10(scale, k as usize);
+        mul_pow10(&mut scale, k as usize);
     } else {
-        mant = mul_pow10(mant, -k as usize);
-        minus = mul_pow10(minus, -k as usize);
-        plus = mul_pow10(plus, -k as usize);
+        mul_pow10(&mut mant, -k as usize);
+        mul_pow10(&mut minus, -k as usize);
+        mul_pow10(&mut plus, -k as usize);
     }
 
     // fixup when `mant + plus > scale` (or `>=`).
@@ -123,19 +125,19 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
     //
     // note that `d[0]` *can* be zero, when `scale - plus < mant < scale`.
     // in this case rounding-up condition (`up` below) will be triggered immediately.
-    if scale.cmp(&mant.clone().add(&plus)) < rounding {
+    if scale.cmp(mant.clone().add(&plus)) < rounding {
         // equivalent to scaling `scale` by 10
         k += 1;
     } else {
-        mant = mant.mul_small(10);
-        minus = minus.mul_small(10);
-        plus = plus.mul_small(10);
+        mant.mul_small(10);
+        minus.mul_small(10);
+        plus.mul_small(10);
     }
 
     // cache `(2, 4, 8) * scale` for digit generation.
-    let scale2 = scale.mul_pow2(1);
-    let scale4 = scale.mul_pow2(2);
-    let scale8 = scale.mul_pow2(3);
+    let mut scale2 = scale.clone(); scale2.mul_pow2(1);
+    let mut scale4 = scale.clone(); scale4.mul_pow2(2);
+    let mut scale8 = scale.clone(); scale8.mul_pow2(3);
 
     let mut down;
     let mut up;
@@ -149,8 +151,7 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
         // where `d[i..j]` is a shorthand for `d[i] * 10^(j-i) + ... + d[j-1] * 10 + d[j]`.
 
         // generate one digit: `d[n] = floor(mant / scale) < 10`.
-        let (d, rem) = div_rem_upto_16(mant, &scale, &scale2, &scale4, &scale8);
-        mant = rem;
+        let (d, _) = div_rem_upto_16(&mut mant, &scale, &scale2, &scale4, &scale8);
         debug_assert!(d < 10);
         buf[i] = b'0' + d;
         i += 1;
@@ -187,21 +188,21 @@ pub fn format_shortest(d: &Decoded, buf: &mut [u8]) -> (/*#digits*/ usize, /*exp
         // - stop and round `up` (increase the last digit) when `scale < mant + plus` (or `<=`).
         // - keep generating otherwise.
         down = mant.cmp(&minus) < rounding;
-        up = scale.cmp(&mant.clone().add(&plus)) < rounding;
+        up = scale.cmp(mant.clone().add(&plus)) < rounding;
         if down || up { break; } // we have the shortest representation, proceed to the rounding
 
         // restore the invariants.
         // this makes the algorithm always terminating: `minus` and `plus` always increases,
         // but `mant` is clipped modulo `scale` and `scale` is fixed.
-        mant = mant.mul_small(10);
-        minus = minus.mul_small(10);
-        plus = plus.mul_small(10);
+        mant.mul_small(10);
+        minus.mul_small(10);
+        plus.mul_small(10);
     }
 
     // rounding up happens when
     // i) only the rounding-up condition was triggered, or
     // ii) both conditions were triggered and tie breaking prefers rounding up.
-    if up && (!down || mant.mul_pow2(1) >= scale) {
+    if up && (!down || *mant.mul_pow2(1) >= scale) {
         // if rounding up changes the length, the exponent should also change.
         // it seems that this condition is very hard to satisfy (possibly impossible),
         // but we are just being safe and consistent here.
@@ -229,27 +230,27 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usi
     let mut mant = Big::from_u64(d.mant);
     let mut scale = Big::from_small(1);
     if d.exp < 0 {
-        scale = scale.mul_pow2(-d.exp as usize);
+        scale.mul_pow2(-d.exp as usize);
     } else {
-        mant = mant.mul_pow2(d.exp as usize);
+        mant.mul_pow2(d.exp as usize);
     }
 
     // divide `mant` by `10^k`. now `scale / 10 < mant <= scale * 10`.
     if k >= 0 {
-        scale = mul_pow10(scale, k as usize);
+        mul_pow10(&mut scale, k as usize);
     } else {
-        mant = mul_pow10(mant, -k as usize);
+        mul_pow10(&mut mant, -k as usize);
     }
 
     // fixup when `mant + plus >= scale`, where `plus / scale = 10^-buf.len() / 2`.
     // in order to keep the fixed-size bignum, we actually use `mant + floor(plus) >= scale`.
     // we are not actually modifying `scale`, since we can skip the initial multiplication instead.
     // again with the shortest algorithm, `d[0]` can be zero but will be eventually rounded up.
-    if div_2pow10(scale.clone(), buf.len()).add(&mant) >= scale {
+    if *div_2pow10(&mut scale.clone(), buf.len()).add(&mant) >= scale {
         // equivalent to scaling `scale` by 10
         k += 1;
     } else {
-        mant = mant.mul_small(10);
+        mant.mul_small(10);
     }
 
     // if we are working with the last-digit limitation, we need to shorten the buffer
@@ -270,9 +271,9 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usi
     if len > 0 {
         // cache `(2, 4, 8) * scale` for digit generation.
         // (this can be expensive, so do not calculate them when the buffer is empty.)
-        let scale2 = scale.mul_pow2(1);
-        let scale4 = scale.mul_pow2(2);
-        let scale8 = scale.mul_pow2(3);
+        let mut scale2 = scale.clone(); scale2.mul_pow2(1);
+        let mut scale4 = scale.clone(); scale4.mul_pow2(2);
+        let mut scale8 = scale.clone(); scale8.mul_pow2(3);
 
         for i in 0..len {
             if mant.is_zero() { // following digits are all zeroes, we stop here
@@ -282,19 +283,19 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usi
             }
 
             let mut d = 0;
-            if mant >= scale8 { mant = mant.sub(&scale8); d += 8; }
-            if mant >= scale4 { mant = mant.sub(&scale4); d += 4; }
-            if mant >= scale2 { mant = mant.sub(&scale2); d += 2; }
-            if mant >= scale  { mant = mant.sub(&scale);  d += 1; }
+            if mant >= scale8 { mant.sub(&scale8); d += 8; }
+            if mant >= scale4 { mant.sub(&scale4); d += 4; }
+            if mant >= scale2 { mant.sub(&scale2); d += 2; }
+            if mant >= scale  { mant.sub(&scale);  d += 1; }
             debug_assert!(mant < scale);
             debug_assert!(d < 10);
             buf[i] = b'0' + d;
-            mant = mant.mul_small(10);
+            mant.mul_small(10);
         }
     }
 
     // rounding up if we stop in the middle of digits
-    if mant >= scale.mul_small(5) {
+    if mant >= *scale.mul_small(5) {
         // if rounding up changes the length, the exponent should also change.
         // but we've been requested a fixed number of digits, so do not alter the buffer...
         if let Some(c) = round_up(buf, len) {

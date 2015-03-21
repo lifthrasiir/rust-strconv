@@ -94,7 +94,7 @@ macro_rules! define_bignum {
                 self.base[..self.size].iter().all(|&v| v == 0)
             }
 
-            pub fn add(mut self, other: &$name) -> $name {
+            pub fn add<'a>(&'a mut self, other: &$name) -> &'a mut $name {
                 use core::cmp;
                 use flt2dec::bignum::FullOps;
 
@@ -113,7 +113,7 @@ macro_rules! define_bignum {
                 self
             }
 
-            pub fn sub(mut self, other: &$name) -> $name {
+            pub fn sub<'a>(&'a mut self, other: &$name) -> &'a mut $name {
                 use core::cmp;
                 use flt2dec::bignum::FullOps;
 
@@ -129,7 +129,7 @@ macro_rules! define_bignum {
                 self
             }
 
-            pub fn mul_small(mut self, other: $ty) -> $name {
+            pub fn mul_small<'a>(&'a mut self, other: $ty) -> &'a mut $name {
                 use flt2dec::bignum::FullOps;
 
                 let mut sz = self.size;
@@ -147,7 +147,7 @@ macro_rules! define_bignum {
                 self
             }
 
-            pub fn mul_pow2(mut self, bits: usize) -> $name {
+            pub fn mul_pow2<'a>(&'a mut self, bits: usize) -> &'a mut $name {
                 use core::mem;
 
                 let digitbits = mem::size_of::<$ty>() * 8;
@@ -187,12 +187,11 @@ macro_rules! define_bignum {
                 self
             }
 
-            pub fn mul_digits(&self, other: &[$ty]) -> $name {
+            pub fn mul_digits<'a>(&'a mut self, other: &[$ty]) -> &'a mut $name {
                 // the internal routine. works best when aa.len() <= bb.len().
-                fn mul_inner(aa: &[$ty], bb: &[$ty]) -> ([$ty; $n], usize) {
+                fn mul_inner(ret: &mut [$ty; $n], aa: &[$ty], bb: &[$ty]) -> usize {
                     use flt2dec::bignum::FullOps;
 
-                    let mut ret = [0; $n];
                     let mut retsz = 0;
                     for (i, &a) in aa.iter().enumerate() {
                         if a == 0 { continue; }
@@ -211,19 +210,21 @@ macro_rules! define_bignum {
                             retsz = i + sz;
                         }
                     }
-
-                    (ret, retsz)
+                    retsz
                 }
 
-                let (ret, retsz) = if self.size < other.len() {
-                    mul_inner(&self.base[..self.size], other)
+                let mut ret = [0; $n];
+                let retsz = if self.size < other.len() {
+                    mul_inner(&mut ret, &self.base[..self.size], other)
                 } else {
-                    mul_inner(other, &self.base[..self.size])
+                    mul_inner(&mut ret, other, &self.base[..self.size])
                 };
-                $name { size: retsz, base: ret }
+                self.base = ret;
+                self.size = retsz;
+                self
             }
 
-            pub fn div_rem_small(mut self, other: $ty) -> ($name, $ty) {
+            pub fn div_rem_small<'a>(&'a mut self, other: $ty) -> (&'a mut $name, $ty) {
                 use flt2dec::bignum::FullOps;
 
                 assert!(other > 0);
