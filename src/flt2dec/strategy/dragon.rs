@@ -404,3 +404,23 @@ fn bench_big_exact_inf(b: &mut test::Bencher) {
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
+#[cfg(test)] #[test]
+fn test_to_shortest_str() {
+    testing::to_shortest_str_test(format_shortest);
+}
+
+#[cfg(test)] #[test]
+fn test_to_shortest_exp_str() {
+    testing::to_shortest_exp_str_test(format_shortest);
+}
+
+#[cfg(test)] #[test]
+fn test_to_exact_exp_str() {
+    testing::to_exact_exp_str_test(format_exact);
+}
+
+#[cfg(test)] #[test]
+fn test_to_exact_fixed_str() {
+    testing::to_exact_fixed_str_test(format_exact);
+}
+

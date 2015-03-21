@@ -392,23 +392,3 @@ pub fn to_exact_fixed_str<'a, T: Float, F>(mut format_exact: F, v: T,
     }
 }
 
-#[test]
-fn test_to_shortest_str() {
-    testing::to_shortest_str_test(strategy::grisu::format_shortest);
-}
-
-#[test]
-fn test_to_shortest_exp_str() {
-    testing::to_shortest_exp_str_test(strategy::grisu::format_shortest);
-}
-
-#[test]
-fn test_to_exact_exp_str() {
-    testing::to_exact_exp_str_test(strategy::grisu::format_exact);
-}
-
-#[test]
-fn test_to_exact_fixed_str() {
-    testing::to_exact_fixed_str_test(strategy::grisu::format_exact);
-}
-
