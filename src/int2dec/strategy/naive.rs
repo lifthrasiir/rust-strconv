@@ -3,7 +3,6 @@ use num::div_rem;
 
 use int2dec::digits::{Digits64, Digits32, Digits16, Digits8};
 use int2dec::digits::{NDIGITS64, NDIGITS32, NDIGITS16, NDIGITS8};
-#[cfg(test)] use int2dec::testing;
 
 pub fn u64_to_digits(mut n: u64) -> Digits64 {
     let mut buf: Digits64 = [0; NDIGITS64];
@@ -43,33 +42,5 @@ pub fn u8_to_digits(mut n: u8) -> Digits8 {
         n = q;
     }
     buf
-}
-
-#[cfg(test)] #[test]
-fn sanity_test() {
-    testing::u64_sanity_test(u64_to_digits);
-    testing::u32_sanity_test(u32_to_digits);
-    testing::u16_sanity_test(u16_to_digits);
-    testing::u8_sanity_test(u8_to_digits);
-}
-
-#[cfg(test)] #[bench]
-fn bench_u64(b: &mut testing::Bencher) {
-    testing::rotating_bench(u64_to_digits, b);
-}
-
-#[cfg(test)] #[bench]
-fn bench_u32(b: &mut testing::Bencher) {
-    testing::rotating_bench(u32_to_digits, b);
-}
-
-#[cfg(test)] #[bench]
-fn bench_u16(b: &mut testing::Bencher) {
-    testing::rotating_bench(u16_to_digits, b);
-}
-
-#[cfg(test)] #[bench]
-fn bench_u8(b: &mut testing::Bencher) {
-    testing::rotating_bench(u8_to_digits, b);
 }
 

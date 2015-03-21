@@ -3,7 +3,6 @@ use num::div_rem;
 use int2dec::digits::{Digits64, Digits32};
 use int2dec::digits::{NDIGITS64, NDIGITS32};
 use int2dec::digits::{ONES, TENS};
-#[cfg(test)] use int2dec::testing;
 
 // http://homepage.cs.uiowa.edu/~jones/bcd/decimal.html#sixtyfour
 pub fn u64_to_digits(n: u64) -> Digits64 {
@@ -58,21 +57,5 @@ pub fn u32_to_digits(n: u32) -> Digits32 {
     buf[0] = tens!(d2); buf[1] = ones!(d2);
 
     buf
-}
-
-#[cfg(test)] #[test]
-fn sanity_test() {
-    testing::u64_sanity_test(u64_to_digits);
-    testing::u32_sanity_test(u32_to_digits);
-}
-
-#[cfg(test)] #[bench]
-fn bench_u64(b: &mut testing::Bencher) {
-    testing::rotating_bench(u64_to_digits, b);
-}
-
-#[cfg(test)] #[bench]
-fn bench_u32(b: &mut testing::Bencher) {
-    testing::rotating_bench(u32_to_digits, b);
 }
 
