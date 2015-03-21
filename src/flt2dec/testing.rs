@@ -1,12 +1,20 @@
 use std::{str, mem, i16, f32, f64, fmt};
-use std::num::Float;
+use core::num::Float;
+use std::num::Float as StdFloat;
 use std::slice::bytes;
 use rand;
 use rand::distributions::{IndependentSample, Range};
-use flt2dec::{decode, Decoded, MAX_SIG_DIGITS, round_up, Part, Sign};
+use flt2dec::{decode, FullDecoded, Decoded, MAX_SIG_DIGITS, round_up, Part, Sign};
 use flt2dec::{to_shortest_str, to_shortest_exp_str, to_exact_exp_str, to_exact_fixed_str};
 
 pub use test::Bencher;
+
+pub fn decode_finite<T: Float + 'static>(v: T) -> Decoded {
+    match decode(v).1 {
+        FullDecoded::Finite(decoded) => decoded,
+        full_decoded => panic!("expected finite, got {:?} instead", full_decoded)
+    }
+}
 
 macro_rules! check_shortest {
     ($f:ident($v:expr) => $buf:expr, $exp:expr) => (
@@ -23,7 +31,7 @@ macro_rules! check_shortest {
 
     ($f:ident($v:expr) => $buf:expr, $exp:expr; $fmt:expr, $($key:ident = $val:expr),*) => ({
         let mut buf = [b'_'; MAX_SIG_DIGITS];
-        let (len, k) = $f(&decode($v), &mut buf);
+        let (len, k) = $f(&decode_finite($v), &mut buf);
         assert!((&buf[..len], k) == ($buf, $exp),
                 $fmt, actual = (str::from_utf8(&buf[..len]).unwrap(), k),
                       expected = (str::from_utf8($buf).unwrap(), $exp),
@@ -63,13 +71,14 @@ macro_rules! try_fixed {
     })
 }
 
-fn check_exact<F, T: Float>(mut f: F, v: T, vstr: &str, expected: &[u8], expectedk: i16)
-        where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+fn check_exact<F, T>(mut f: F, v: T, vstr: &str, expected: &[u8], expectedk: i16)
+        where T: Float + 'static,
+              F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     // use a large enough buffer
     let mut buf = [b'_'; 1024];
     let mut expected_ = [b'_'; 1024];
 
-    let decoded = decode(v);
+    let decoded = decode_finite(v);
     let cut = expected.iter().position(|&c| c == b' ');
 
     // check significant digits
@@ -130,13 +139,13 @@ fn check_exact<F, T: Float>(mut f: F, v: T, vstr: &str, expected: &[u8], expecte
     }
 }
 
-fn check_exact_one<F, T: Float + fmt::Display>(mut f: F, x: T, e: isize, tstr: &str,
-                                               expected: &[u8], expectedk: i16)
-        where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+fn check_exact_one<F, T>(mut f: F, x: T, e: isize, tstr: &str, expected: &[u8], expectedk: i16)
+        where T: Float + StdFloat + fmt::Display + 'static,
+              F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     // use a large enough buffer
     let mut buf = [b'_'; 1024];
-    let v: T = Float::ldexp(x, e);
-    let decoded = decode(v);
+    let v: T = StdFloat::ldexp(x, e);
+    let decoded = decode_finite(v);
 
     try_exact!(f(&decoded) => &mut buf, &expected, expectedk;
                "exact mismatch for v={x}p{e}{t}: actual {actual:?}, expected {expected:?}",
@@ -200,13 +209,13 @@ pub fn f32_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8])
     // 10^-44 * 0
     // 10^-44 * 0.1401298464324817070923729583289916131280...
     // 10^-44 * 0.2802596928649634141847459166579832262560...
-    let minf32: f32 = Float::ldexp(1.0, -149);
+    let minf32: f32 = StdFloat::ldexp(1.0, -149);
     check_shortest!(f(minf32) => b"1", -44);
 }
 
 pub fn f32_exact_sanity_test<F>(mut f: F)
         where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
-    let minf32: f32 = Float::ldexp(1.0, -149);
+    let minf32: f32 = StdFloat::ldexp(1.0, -149);
 
     check_exact!(f(0.1f32)            => b"100000001490116119384765625             ", 0);
     check_exact!(f(1.0f32/3.0)        => b"3333333432674407958984375               ", 0);
@@ -298,13 +307,13 @@ pub fn f64_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8])
     // 10^-323 * 0
     // 10^-323 * 0.4940656458412465441765687928682213723650...
     // 10^-323 * 0.9881312916824930883531375857364427447301...
-    let minf64: f64 = Float::ldexp(1.0, -1074);
+    let minf64: f64 = StdFloat::ldexp(1.0, -1074);
     check_shortest!(f(minf64) => b"5", -323);
 }
 
 pub fn f64_exact_sanity_test<F>(mut f: F)
         where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
-    let minf64: f64 = Float::ldexp(1.0, -1074);
+    let minf64: f64 = StdFloat::ldexp(1.0, -1074);
 
     check_exact!(f(0.1f64)            => b"1000000000000000055511151231257827021181", 0);
     check_exact!(f(0.45f64)           => b"4500000000000000111022302462515654042363", 0);
@@ -388,9 +397,9 @@ pub fn f64_exact_sanity_test<F>(mut f: F)
 
 pub fn more_shortest_sanity_test<F>(mut f: F) where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     check_shortest!(f{mant: 99_999_999_999_999_999, minus: 1, plus: 1,
-                      exp: 0, sign: 1, inclusive: true} => b"1", 18);
+                      exp: 0, inclusive: true} => b"1", 18);
     check_shortest!(f{mant: 99_999_999_999_999_999, minus: 1, plus: 1,
-                      exp: 0, sign: 1, inclusive: false} => b"99999999999999999", 17);
+                      exp: 0, inclusive: false} => b"99999999999999999", 17);
 }
 
 fn iterate<F, G, V>(func: &str, k: usize, n: usize, mut f: F, mut g: G, mut v: V) -> (usize, usize)
@@ -440,7 +449,7 @@ pub fn f32_random_equivalence_test<F, G>(f: F, g: G, k: usize, n: usize)
     iterate("f32_random_equivalence_test", k, n, f, g, |_| {
         let i: u32 = f32_range.ind_sample(&mut rng);
         let x: f32 = unsafe {mem::transmute(i)};
-        decode(x)
+        decode_finite(x)
     });
 }
 
@@ -452,7 +461,7 @@ pub fn f64_random_equivalence_test<F, G>(f: F, g: G, k: usize, n: usize)
     iterate("f64_random_equivalence_test", k, n, f, g, |_| {
         let i: u64 = f64_range.ind_sample(&mut rng);
         let x: f64 = unsafe {mem::transmute(i)};
-        decode(x)
+        decode_finite(x)
     });
 }
 
@@ -469,7 +478,7 @@ pub fn f32_exhaustive_equivalence_test<F, G>(f: F, g: G, k: usize)
     let (npassed, nignored) = iterate("f32_exhaustive_equivalence_test",
                                       k, 0x7f7f_ffff, f, g, |i: usize| {
         let x: f32 = unsafe {mem::transmute(i as u32 + 1)};
-        decode(x)
+        decode_finite(x)
     });
     assert_eq!((npassed, nignored), (2121451879, 17643160));
 }
@@ -497,7 +506,8 @@ pub fn to_shortest_str_test<F>(mut f_: F)
     use super::Sign::*;
 
     fn to_string<T, F>(f: &mut F, v: T, sign: Sign, frac_digits: usize, upper: bool) -> String
-            where T: Float, F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+            where T: Float + StdFloat + 'static,
+                  F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
         to_string_with_parts(|buf, parts| to_shortest_str(|d,b| f(d,b), v, sign,
                                                           frac_digits, upper, buf, parts))
     }
@@ -553,7 +563,7 @@ pub fn to_shortest_str_test<F>(mut f_: F)
     assert_eq!(to_string(f, f32::MAX, Minus, 1, false), format!("34028235{:0>31}.0", ""));
     assert_eq!(to_string(f, f32::MAX, Minus, 8, false), format!("34028235{:0>31}.00000000", ""));
 
-    let minf32: f32 = Float::ldexp(1.0, -149);
+    let minf32: f32 = StdFloat::ldexp(1.0, -149);
     assert_eq!(to_string(f, minf32, Minus,  0, false), format!("0.{:0>44}1", ""));
     assert_eq!(to_string(f, minf32, Minus, 45, false), format!("0.{:0>44}1", ""));
     assert_eq!(to_string(f, minf32, Minus, 46, false), format!("0.{:0>44}10", ""));
@@ -565,7 +575,7 @@ pub fn to_shortest_str_test<F>(mut f_: F)
     assert_eq!(to_string(f, f64::MAX, Minus, 8, false),
                format!("17976931348623157{:0>292}.00000000", ""));
 
-    let minf64: f64 = Float::ldexp(1.0, -1074);
+    let minf64: f64 = StdFloat::ldexp(1.0, -1074);
     assert_eq!(to_string(f, minf64, Minus,   0, false), format!("0.{:0>323}5", ""));
     assert_eq!(to_string(f, minf64, Minus, 324, false), format!("0.{:0>323}5", ""));
     assert_eq!(to_string(f, minf64, Minus, 325, false), format!("0.{:0>323}50", ""));
@@ -579,7 +589,8 @@ pub fn to_shortest_exp_str_test<F>(mut f_: F)
     use super::Sign::*;
 
     fn to_string<T, F>(f: &mut F, v: T, sign: Sign, exp_bounds: (i16, i16), upper: bool) -> String
-            where T: Float, F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+            where T: Float + StdFloat + 'static,
+                  F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
         to_string_with_parts(|buf, parts| to_shortest_exp_str(|d,b| f(d,b), v, sign,
                                                               exp_bounds, upper, buf, parts))
     }
@@ -647,7 +658,7 @@ pub fn to_shortest_exp_str_test<F>(mut f_: F)
     assert_eq!(to_string(f, f32::MAX, Minus, (-39, 38), false), "3.4028235e38");
     assert_eq!(to_string(f, f32::MAX, Minus, (-38, 39), false), format!("34028235{:0>31}", ""));
 
-    let minf32: f32 = Float::ldexp(1.0, -149);
+    let minf32: f32 = StdFloat::ldexp(1.0, -149);
     assert_eq!(to_string(f, minf32, Minus, ( -4, 16), false), "1e-45");
     assert_eq!(to_string(f, minf32, Minus, (-44, 45), false), "1e-45");
     assert_eq!(to_string(f, minf32, Minus, (-45, 44), false), format!("0.{:0>44}1", ""));
@@ -659,7 +670,7 @@ pub fn to_shortest_exp_str_test<F>(mut f_: F)
     assert_eq!(to_string(f, f64::MAX, Minus, (-309, 308), false),
                "1.7976931348623157e308");
 
-    let minf64: f64 = Float::ldexp(1.0, -1074);
+    let minf64: f64 = StdFloat::ldexp(1.0, -1074);
     assert_eq!(to_string(f, minf64, Minus, (  -4,  16), false), "5e-324");
     assert_eq!(to_string(f, minf64, Minus, (-324, 323), false), format!("0.{:0>323}5", ""));
     assert_eq!(to_string(f, minf64, Minus, (-323, 324), false), "5e-324");
@@ -672,7 +683,8 @@ pub fn to_exact_exp_str_test<F>(mut f_: F)
     use super::Sign::*;
 
     fn to_string<T, F>(f: &mut F, v: T, sign: Sign, ndigits: usize, upper: bool) -> String
-            where T: Float, F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+            where T: Float + StdFloat + 'static,
+                  F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
         to_string_with_parts(|buf, parts| to_exact_exp_str(|d,b,l| f(d,b,l), v, sign,
                                                            ndigits, upper, buf, parts))
     }
@@ -776,7 +788,7 @@ pub fn to_exact_exp_str_test<F>(mut f_: F)
     assert_eq!(to_string(f, f32::MAX, Minus, 64, false),
                "3.402823466385288598117041834845169254400000000000000000000000000e38");
 
-    let minf32: f32 = Float::ldexp(1.0, -149);
+    let minf32: f32 = StdFloat::ldexp(1.0, -149);
     assert_eq!(to_string(f, minf32, Minus,   1, false), "1e-45");
     assert_eq!(to_string(f, minf32, Minus,   2, false), "1.4e-45");
     assert_eq!(to_string(f, minf32, Minus,   4, false), "1.401e-45");
@@ -816,7 +828,7 @@ pub fn to_exact_exp_str_test<F>(mut f_: F)
                  0000000000000000000000000000000000000000000000000000000000000000e308");
 
     // okay, this is becoming tough. fortunately for us, this is almost the worst case.
-    let minf64: f64 = Float::ldexp(1.0, -1074);
+    let minf64: f64 = StdFloat::ldexp(1.0, -1074);
     assert_eq!(to_string(f, minf64, Minus,    1, false), "5e-324");
     assert_eq!(to_string(f, minf64, Minus,    2, false), "4.9e-324");
     assert_eq!(to_string(f, minf64, Minus,    4, false), "4.941e-324");
@@ -877,7 +889,8 @@ pub fn to_exact_fixed_str_test<F>(mut f_: F)
     use super::Sign::*;
 
     fn to_string<T, F>(f: &mut F, v: T, sign: Sign, frac_digits: usize, upper: bool) -> String
-            where T: Float, F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+            where T: Float + StdFloat + 'static,
+                  F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
         to_string_with_parts(|buf, parts| to_exact_fixed_str(|d,b,l| f(d,b,l), v, sign,
                                                              frac_digits, upper, buf, parts))
     }
@@ -1002,7 +1015,7 @@ pub fn to_exact_fixed_str_test<F>(mut f_: F)
     assert_eq!(to_string(f, f32::MAX, Minus, 2, false),
                "340282346638528859811704183484516925440.00");
 
-    let minf32: f32 = Float::ldexp(1.0, -149);
+    let minf32: f32 = StdFloat::ldexp(1.0, -149);
     assert_eq!(to_string(f, minf32, Minus,   0, false), "0");
     assert_eq!(to_string(f, minf32, Minus,   1, false), "0.0");
     assert_eq!(to_string(f, minf32, Minus,   2, false), "0.00");
@@ -1034,7 +1047,7 @@ pub fn to_exact_fixed_str_test<F>(mut f_: F)
                 9440758685084551339423045832369032229481658085593321233482747978\
                 26204144723168738177180919299881250404026184124858368.0000000000");
 
-    let minf64: f64 = Float::ldexp(1.0, -1074);
+    let minf64: f64 = StdFloat::ldexp(1.0, -1074);
     assert_eq!(to_string(f, minf64, Minus, 0, false), "0");
     assert_eq!(to_string(f, minf64, Minus, 1, false), "0.0");
     assert_eq!(to_string(f, minf64, Minus, 10, false), "0.0000000000");

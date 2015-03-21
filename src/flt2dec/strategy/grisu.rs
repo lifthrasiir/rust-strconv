@@ -10,7 +10,7 @@ use std::num::{Int, Float};
 #[cfg(test)] use test;
 
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
-#[cfg(test)] use std::i16;
+#[cfg(test)] use std::{i16, f64};
 #[cfg(test)] use flt2dec::testing;
 
 #[derive(Copy, Debug)]
@@ -800,68 +800,56 @@ fn exact_f64_random_equivalence_test() {
 
 #[cfg(test)] #[bench]
 fn bench_small_shortest(b: &mut test::Bencher) {
-    use flt2dec::decode;
-    let decoded = decode(3.141592f64);
+    let decoded = testing::decode_finite(3.141592f64);
     let mut buf = [0; MAX_SIG_DIGITS];
     b.iter(|| format_shortest(&decoded, &mut buf));
 }
 
 #[cfg(test)] #[bench]
 fn bench_big_shortest(b: &mut test::Bencher) {
-    use flt2dec::decode;
-    let v: f64 = Float::max_value();
-    let decoded = decode(v);
+    let decoded = testing::decode_finite(f64::MAX);
     let mut buf = [0; MAX_SIG_DIGITS];
     b.iter(|| format_shortest(&decoded, &mut buf));
 }
 
 #[cfg(test)] #[bench]
 fn bench_small_exact_3(b: &mut test::Bencher) {
-    use flt2dec::decode;
-    let decoded = decode(3.141592f64);
+    let decoded = testing::decode_finite(3.141592f64);
     let mut buf = [0; 3];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
 fn bench_big_exact_3(b: &mut test::Bencher) {
-    use flt2dec::decode;
-    let v: f64 = Float::max_value();
-    let decoded = decode(v);
+    let decoded = testing::decode_finite(f64::MAX);
     let mut buf = [0; 3];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
 fn bench_small_exact_12(b: &mut test::Bencher) {
-    use flt2dec::decode;
-    let decoded = decode(3.141592f64);
+    let decoded = testing::decode_finite(3.141592f64);
     let mut buf = [0; 12];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
 fn bench_big_exact_12(b: &mut test::Bencher) {
-    use flt2dec::decode;
-    let v: f64 = Float::max_value();
-    let decoded = decode(v);
+    let decoded = testing::decode_finite(f64::MAX);
     let mut buf = [0; 12];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
 fn bench_small_exact_inf(b: &mut test::Bencher) {
-    use flt2dec::decode;
-    let decoded = decode(3.141592f64);
+    let decoded = testing::decode_finite(3.141592f64);
     let mut buf = [0; 1024];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }
 
 #[cfg(test)] #[bench]
 fn bench_big_exact_inf(b: &mut test::Bencher) {
-    use flt2dec::decode;
-    let v: f64 = Float::max_value();
-    let decoded = decode(v);
+    let decoded = testing::decode_finite(f64::MAX);
     let mut buf = [0; 1024];
     b.iter(|| format_exact(&decoded, &mut buf, i16::MIN));
 }

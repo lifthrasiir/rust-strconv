@@ -1,6 +1,6 @@
-use std::i16;
-use std::num::{Float, FpCategory};
-pub use self::decoder::{decode, Decoded};
+use core::i16;
+use core::num::Float;
+pub use self::decoder::{decode, FullDecoded, Decoded};
 
 mod estimator;
 mod bignum;
@@ -157,48 +157,47 @@ pub enum Sign {
     MinusPlusRaw, // -1 -0 +0 +1
 }
 
-fn determine_sign(sign: Sign, category: FpCategory, decoded_sign: i8) -> Option<Part<'static>> {
+fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> Option<Part<'static>> {
     const PLUS:  Part<'static> = Part::Copy(b"+");
     const MINUS: Part<'static> = Part::Copy(b"-");
 
-    match (category, sign) {
-        (FpCategory::Nan, _) => None,
-        (FpCategory::Zero, Sign::Minus) => None,
-        (FpCategory::Zero, Sign::MinusPlus) => Some(PLUS),
-        (FpCategory::Zero, Sign::MinusPlusRaw) =>
-            if decoded_sign < 0 { Some(MINUS) } else { Some(PLUS) },
+    match (*decoded, sign) {
+        (FullDecoded::Nan, _) => None,
+        (FullDecoded::Zero, Sign::Minus) => None,
+        (FullDecoded::Zero, Sign::MinusPlus) => Some(PLUS),
+        (FullDecoded::Zero, Sign::MinusPlusRaw) =>
+            if negative { Some(MINUS) } else { Some(PLUS) },
         (_, Sign::Minus) =>
-            if decoded_sign < 0 { Some(MINUS) } else { None },
+            if negative { Some(MINUS) } else { None },
         (_, Sign::MinusPlus) | (_, Sign::MinusPlusRaw) =>
-            if decoded_sign < 0 { Some(MINUS) } else { Some(PLUS) },
+            if negative { Some(MINUS) } else { Some(PLUS) },
     }
 }
 
-pub fn to_shortest_str<'a, T: Float, F>(mut format_shortest: F, v: T,
-                                        sign: Sign, frac_digits: usize, upper: bool,
-                                        buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
-        where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
+                                 sign: Sign, frac_digits: usize, upper: bool,
+                                 buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
+        where T: Float + 'static,
+              F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     assert!(parts.len() >= 5);
     assert!(buf.len() >= MAX_SIG_DIGITS);
 
-    let category = v.classify();
-    let decoded = decode(v);
-
+    let (negative, full_decoded) = decode(v);
     let mut n = 0;
-    if let Some(part) = determine_sign(sign, category, decoded.sign) {
+    if let Some(part) = determine_sign(sign, &full_decoded, negative) {
         parts[0] = part;
         n += 1;
     }
-    match category {
-        FpCategory::Nan => {
+    match full_decoded {
+        FullDecoded::Nan => {
             parts[n] = Part::Copy(if upper { b"NAN" } else { b"nan" });
             n + 1
         }
-        FpCategory::Infinite => {
+        FullDecoded::Infinite => {
             parts[n] = Part::Copy(if upper { b"INF" } else { b"inf" });
             n + 1
         }
-        FpCategory::Zero => {
+        FullDecoded::Zero => {
             if frac_digits > 0 { // [0.][0000]
                 parts[n] = Part::Copy(b"0.");
                 parts[n + 1] = Part::Zero(frac_digits);
@@ -208,40 +207,39 @@ pub fn to_shortest_str<'a, T: Float, F>(mut format_shortest: F, v: T,
                 n + 1
             }
         }
-        FpCategory::Subnormal | FpCategory::Normal => {
-            let (len, exp) = format_shortest(&decoded, buf);
+        FullDecoded::Finite(ref decoded) => {
+            let (len, exp) = format_shortest(decoded, buf);
             n + digits_to_dec_str(&buf[..len], exp, frac_digits, &mut parts[n..])
         }
     }
 }
 
 // dec_bounds == (min, max) s.t. 10^min <= v < 10^max will be rendered as decimal
-pub fn to_shortest_exp_str<'a, T: Float, F>(mut format_shortest: F, v: T,
-                                            sign: Sign, dec_bounds: (i16, i16), upper: bool,
-                                            buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
-        where F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+pub fn to_shortest_exp_str<'a, T, F>(mut format_shortest: F, v: T,
+                                     sign: Sign, dec_bounds: (i16, i16), upper: bool,
+                                     buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
+        where T: Float + 'static,
+              F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     assert!(parts.len() >= 7);
     assert!(buf.len() >= MAX_SIG_DIGITS);
     assert!(dec_bounds.0 <= dec_bounds.1);
 
-    let category = v.classify();
-    let decoded = decode(v);
-
+    let (negative, full_decoded) = decode(v);
     let mut n = 0;
-    if let Some(part) = determine_sign(sign, category, decoded.sign) {
+    if let Some(part) = determine_sign(sign, &full_decoded, negative) {
         parts[0] = part;
         n += 1;
     }
-    match category {
-        FpCategory::Nan => {
+    match full_decoded {
+        FullDecoded::Nan => {
             parts[n] = Part::Copy(if upper { b"NAN" } else { b"nan" });
             n + 1
         }
-        FpCategory::Infinite => {
+        FullDecoded::Infinite => {
             parts[n] = Part::Copy(if upper { b"INF" } else { b"inf" });
             n + 1
         }
-        FpCategory::Zero => {
+        FullDecoded::Zero => {
             parts[n] = if dec_bounds.0 <= 0 && 0 < dec_bounds.1 {
                 Part::Copy(b"0")
             } else {
@@ -249,8 +247,8 @@ pub fn to_shortest_exp_str<'a, T: Float, F>(mut format_shortest: F, v: T,
             };
             n + 1
         }
-        FpCategory::Subnormal | FpCategory::Normal => {
-            let (len, exp) = format_shortest(&decoded, buf);
+        FullDecoded::Finite(ref decoded) => {
+            let (len, exp) = format_shortest(decoded, buf);
             let vis_exp = exp as i32 - 1;
             if dec_bounds.0 as i32 <= vis_exp && vis_exp < dec_bounds.1 as i32 {
                 n + digits_to_dec_str(&buf[..len], exp, 0, &mut parts[n..])
@@ -284,33 +282,30 @@ fn estimate_max_buf_len(exp: i16) -> usize {
     21 + ((if exp < 0 { -12 } else { 5 } * exp as i32) as usize >> 4)
 }
 
-pub fn to_exact_exp_str<'a, T: Float, F>(mut format_exact: F, v: T,
-                                         sign: Sign, ndigits: usize, upper: bool,
-                                         buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
-        where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
+                                  sign: Sign, ndigits: usize, upper: bool,
+                                  buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
+        where T: Float + 'static,
+              F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     assert!(parts.len() >= 7);
     assert!(ndigits > 0);
 
-    let category = v.classify();
-    let decoded = decode(v);
-    let maxlen = estimate_max_buf_len(decoded.exp);
-    assert!(buf.len() >= ndigits || buf.len() >= maxlen);
-
+    let (negative, full_decoded) = decode(v);
     let mut n = 0;
-    if let Some(part) = determine_sign(sign, category, decoded.sign) {
+    if let Some(part) = determine_sign(sign, &full_decoded, negative) {
         parts[0] = part;
         n += 1;
     }
-    match category {
-        FpCategory::Nan => {
+    match full_decoded {
+        FullDecoded::Nan => {
             parts[n] = Part::Copy(if upper { b"NAN" } else { b"nan" });
             n + 1
         }
-        FpCategory::Infinite => {
+        FullDecoded::Infinite => {
             parts[n] = Part::Copy(if upper { b"INF" } else { b"inf" });
             n + 1
         }
-        FpCategory::Zero => {
+        FullDecoded::Zero => {
             if ndigits > 1 { // [0.][0000][e0]
                 parts[n] = Part::Copy(b"0.");
                 parts[n + 1] = Part::Zero(ndigits - 1);
@@ -321,40 +316,40 @@ pub fn to_exact_exp_str<'a, T: Float, F>(mut format_exact: F, v: T,
                 n + 1
             }
         }
-        FpCategory::Subnormal | FpCategory::Normal => {
+        FullDecoded::Finite(ref decoded) => {
+            let maxlen = estimate_max_buf_len(decoded.exp);
+            assert!(buf.len() >= ndigits || buf.len() >= maxlen);
+
             let trunc = if ndigits < maxlen { ndigits } else { maxlen };
-            let (len, exp) = format_exact(&decoded, &mut buf[..trunc], i16::MIN);
+            let (len, exp) = format_exact(decoded, &mut buf[..trunc], i16::MIN);
             n + digits_to_exp_str(&buf[..len], exp, ndigits, upper, &mut parts[n..])
         }
     }
 }
 
-pub fn to_exact_fixed_str<'a, T: Float, F>(mut format_exact: F, v: T,
-                                           sign: Sign, frac_digits: usize, upper: bool,
-                                           buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
-        where F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+pub fn to_exact_fixed_str<'a, T, F>(mut format_exact: F, v: T,
+                                    sign: Sign, frac_digits: usize, upper: bool,
+                                    buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
+        where T: Float + 'static,
+              F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     assert!(parts.len() >= 6);
 
-    let category = v.classify();
-    let decoded = decode(v);
-    let maxlen = estimate_max_buf_len(decoded.exp);
-    assert!(buf.len() >= maxlen);
-
+    let (negative, full_decoded) = decode(v);
     let mut n = 0;
-    if let Some(part) = determine_sign(sign, category, decoded.sign) {
+    if let Some(part) = determine_sign(sign, &full_decoded, negative) {
         parts[0] = part;
         n += 1;
     }
-    match category {
-        FpCategory::Nan => {
+    match full_decoded {
+        FullDecoded::Nan => {
             parts[n] = Part::Copy(if upper { b"NAN" } else { b"nan" });
             n + 1
         }
-        FpCategory::Infinite => {
+        FullDecoded::Infinite => {
             parts[n] = Part::Copy(if upper { b"INF" } else { b"inf" });
             n + 1
         }
-        FpCategory::Zero => {
+        FullDecoded::Zero => {
             if frac_digits > 0 { // [0.][0000]
                 parts[n] = Part::Copy(b"0.");
                 parts[n + 1] = Part::Zero(frac_digits);
@@ -364,12 +359,15 @@ pub fn to_exact_fixed_str<'a, T: Float, F>(mut format_exact: F, v: T,
                 n + 1
             }
         }
-        FpCategory::Subnormal | FpCategory::Normal => {
+        FullDecoded::Finite(ref decoded) => {
+            let maxlen = estimate_max_buf_len(decoded.exp);
+            assert!(buf.len() >= maxlen);
+
             // it *is* possible that `frac_digits` is ridiculously large.
             // `format_exact` will end rendering digits much earlier in this case,
             // because we are strictly limited by `maxlen`.
             let limit = if frac_digits < 0x8000 { -(frac_digits as i16) } else { i16::MIN };
-            let (len, exp) = format_exact(&decoded, &mut buf[..maxlen], limit);
+            let (len, exp) = format_exact(decoded, &mut buf[..maxlen], limit);
             if exp <= limit {
                 // `format_exact` always returns at least one digit even though the restriction
                 // hasn't been met, so we catch this condition and treats as like zeroes.
