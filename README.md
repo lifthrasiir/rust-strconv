@@ -120,7 +120,8 @@ There are several strategies available:
   (Status: Implemented. Roughly tested.)
 * `grisu` implements the Grisu3 algorithm described by Florian Loitsch.
   This returns either a formatted number or an error, in which case the caller should fall back.
-  Both case is very fast so it is best to use with `dragon`. Uses about 1KB of precomputed table.
+  Both case is very fast so it can be used with other correct but slow algorithms like `dragon`.
+  Uses about 1KB of precomputed table.
   (Status: Implemented. f32 shortest is tested exhaustively for f32, others are roughly tested.)
 * `system` is a dummy strategy for the comparison; it is Rust's built-in string conversion.
   This incurs the allocation (there is no way to avoid that), and it produces an inexact result.
