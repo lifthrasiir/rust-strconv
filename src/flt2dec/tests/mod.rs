@@ -3,8 +3,8 @@ use std::{str, mem, i16, f32, f64, fmt};
 use core::num::Float;
 use std::num::Float as StdFloat;
 use std::slice::bytes;
-use std::rand;
-use std::rand::distributions::{IndependentSample, Range};
+use rand;
+use rand::distributions::{IndependentSample, Range};
 
 use flt2dec::{decode, FullDecoded, Decoded, MAX_SIG_DIGITS, round_up, Part, Sign};
 use flt2dec::{to_shortest_str, to_shortest_exp_str, to_exact_exp_str, to_exact_fixed_str};
@@ -504,9 +504,9 @@ fn to_string_with_parts<F>(mut f: F) -> String
     let mut ret = String::new();
     for part in &parts[..nparts] {
         match *part {
-            Part::Copy(buf) => ret.push_str(str::from_utf8(buf).unwrap()),
             Part::Num(v) => ret.push_str(&format!("{}", v)),
             Part::Zero(nzeroes) => ret.extend(iter::repeat('0').take(nzeroes)),
+            Part::Sign(buf) | Part::Copy(buf) => ret.push_str(str::from_utf8(buf).unwrap()),
         }
     }
     ret

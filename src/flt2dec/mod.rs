@@ -164,6 +164,9 @@ pub enum Part<'a> {
     Zero(usize),
     /// A literal number up to 5 digits.
     Num(u16),
+    /// A sign. This always occurs as the first part of the formatted number.
+    /// This is separate from `Copy` to allow sign-aware zero padding.
+    Sign(&'a [u8]),
     /// A verbatim copy of given bytes.
     Copy(&'a [u8]),
 }
@@ -172,10 +175,10 @@ impl<'a> Part<'a> {
     /// Returns the exact byte length of given part.
     pub fn len(&self) -> usize {
         match *self {
-            Part::Copy(buf) => buf.len(),
+            Part::Zero(nzeroes) => nzeroes,
             Part::Num(v) => if v < 1_000 { if v < 10 { 1 } else if v < 100 { 2 } else { 3 } }
                             else { if v < 10_000 { 4 } else { 5 } },
-            Part::Zero(nzeroes) => nzeroes,
+            Part::Sign(buf) | Part::Copy(buf) => buf.len(),
         }
     }
 }
@@ -302,21 +305,16 @@ pub enum Sign {
     MinusPlusRaw, // -1 -0 +0 +1
 }
 
-/// Returns the part corresponding to the sign to be formatted, if any.
-fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> Option<Part<'static>> {
-    const PLUS:  Part<'static> = Part::Copy(b"+");
-    const MINUS: Part<'static> = Part::Copy(b"-");
-
+/// Returns the static byte string corresponding to the sign to be formatted.
+/// It can be either `b""`, `b"+"` or `b"-"`.
+fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> &'static [u8] {
     match (*decoded, sign) {
-        (FullDecoded::Nan, _) => None,
-        (FullDecoded::Zero, Sign::Minus) => None,
-        (FullDecoded::Zero, Sign::MinusPlus) => Some(PLUS),
-        (FullDecoded::Zero, Sign::MinusPlusRaw) =>
-            if negative { Some(MINUS) } else { Some(PLUS) },
-        (_, Sign::Minus) =>
-            if negative { Some(MINUS) } else { None },
-        (_, Sign::MinusPlus) | (_, Sign::MinusPlusRaw) =>
-            if negative { Some(MINUS) } else { Some(PLUS) },
+        (FullDecoded::Nan, _) => b"",
+        (FullDecoded::Zero, Sign::Minus) => b"",
+        (FullDecoded::Zero, Sign::MinusPlus) => b"+",
+        (FullDecoded::Zero, Sign::MinusPlusRaw) => if negative { b"-" } else { b"+" },
+        (_, Sign::Minus) => if negative { b"-" } else { b"" },
+        (_, Sign::MinusPlus) | (_, Sign::MinusPlusRaw) => if negative { b"-" } else { b"+" },
     }
 }
 
@@ -324,7 +322,8 @@ fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> Option<P
 /// given number of fractional digits. The result is stored to the supplied parts
 /// array while utilizing given byte buffer as a scratch, and the number of
 /// parts written is returned. `upper` is only used to determine the case of
-/// non-finite values, i.e. `inf` and `nan`.
+/// non-finite values, i.e. `inf` and `nan`. The first part to be rendered is
+/// always a `Part::Sign` (which can be an empty string if no sign is rendered).
 ///
 /// `format_shortest` should be the underlying digit-generation function.
 /// You probably would want `strategy::grisu::format_shortest` for this.
@@ -346,33 +345,29 @@ pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
     assert!(buf.len() >= MAX_SIG_DIGITS);
 
     let (negative, full_decoded) = decode(v);
-    let mut n = 0;
-    if let Some(part) = determine_sign(sign, &full_decoded, negative) {
-        parts[0] = part;
-        n += 1;
-    }
+    parts[0] = Part::Sign(determine_sign(sign, &full_decoded, negative));
     match full_decoded {
         FullDecoded::Nan => {
-            parts[n] = Part::Copy(if upper { b"NAN" } else { b"nan" });
-            n + 1
+            parts[1] = Part::Copy(if upper { b"NAN" } else { b"nan" });
+            2
         }
         FullDecoded::Infinite => {
-            parts[n] = Part::Copy(if upper { b"INF" } else { b"inf" });
-            n + 1
+            parts[1] = Part::Copy(if upper { b"INF" } else { b"inf" });
+            2
         }
         FullDecoded::Zero => {
             if frac_digits > 0 { // [0.][0000]
-                parts[n] = Part::Copy(b"0.");
-                parts[n + 1] = Part::Zero(frac_digits);
-                n + 2
+                parts[1] = Part::Copy(b"0.");
+                parts[2] = Part::Zero(frac_digits);
+                3
             } else {
-                parts[n] = Part::Copy(b"0");
-                n + 1
+                parts[1] = Part::Copy(b"0");
+                2
             }
         }
         FullDecoded::Finite(ref decoded) => {
             let (len, exp) = format_shortest(decoded, buf);
-            n + digits_to_dec_str(&buf[..len], exp, frac_digits, &mut parts[n..])
+            1 + digits_to_dec_str(&buf[..len], exp, frac_digits, &mut parts[1..])
         }
     }
 }
@@ -382,7 +377,9 @@ pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
 /// stored to the supplied parts array while utilizing given byte buffer
 /// as a scratch, and the number of parts written is returned.
 /// `upper` is used to determine the case of non-finite values (`inf` and `nan`)
-/// or the case of the exponent prefix (`e` or `E`).
+/// or the case of the exponent prefix (`e` or `E`). The first part to be
+/// rendered is always a `Part::Sign` (which can be an empty string if
+/// no sign is rendered).
 ///
 /// `format_shortest` should be the underlying digit-generation function.
 /// You probably would want `strategy::grisu::format_shortest` for this.
@@ -405,35 +402,31 @@ pub fn to_shortest_exp_str<'a, T, F>(mut format_shortest: F, v: T,
     assert!(dec_bounds.0 <= dec_bounds.1);
 
     let (negative, full_decoded) = decode(v);
-    let mut n = 0;
-    if let Some(part) = determine_sign(sign, &full_decoded, negative) {
-        parts[0] = part;
-        n += 1;
-    }
+    parts[0] = Part::Sign(determine_sign(sign, &full_decoded, negative));
     match full_decoded {
         FullDecoded::Nan => {
-            parts[n] = Part::Copy(if upper { b"NAN" } else { b"nan" });
-            n + 1
+            parts[1] = Part::Copy(if upper { b"NAN" } else { b"nan" });
+            2
         }
         FullDecoded::Infinite => {
-            parts[n] = Part::Copy(if upper { b"INF" } else { b"inf" });
-            n + 1
+            parts[1] = Part::Copy(if upper { b"INF" } else { b"inf" });
+            2
         }
         FullDecoded::Zero => {
-            parts[n] = if dec_bounds.0 <= 0 && 0 < dec_bounds.1 {
+            parts[1] = if dec_bounds.0 <= 0 && 0 < dec_bounds.1 {
                 Part::Copy(b"0")
             } else {
                 Part::Copy(if upper { b"0E0" } else { b"0e0" })
             };
-            n + 1
+            2
         }
         FullDecoded::Finite(ref decoded) => {
             let (len, exp) = format_shortest(decoded, buf);
             let vis_exp = exp as i32 - 1;
             if dec_bounds.0 as i32 <= vis_exp && vis_exp < dec_bounds.1 as i32 {
-                n + digits_to_dec_str(&buf[..len], exp, 0, &mut parts[n..])
+                1 + digits_to_dec_str(&buf[..len], exp, 0, &mut parts[1..])
             } else {
-                n + digits_to_exp_str(&buf[..len], exp, 0, upper, &mut parts[n..])
+                1 + digits_to_exp_str(&buf[..len], exp, 0, upper, &mut parts[1..])
             }
         }
     }
@@ -467,7 +460,9 @@ fn estimate_max_buf_len(exp: i16) -> usize {
 /// exactly given number of significant digits. The result is stored to
 /// the supplied parts array while utilizing given byte buffer as a scratch,
 /// and the number of parts written is returned. `upper` is used to
-/// determine the case of the exponent prefix (`e` or `E`).
+/// determine the case of the exponent prefix (`e` or `E`). The first part
+/// to be rendered is always a `Part::Sign` (which can be an empty string if
+/// no sign is rendered).
 ///
 /// `format_exact` should be the underlying digit-generation function.
 /// You probably would want `strategy::grisu::format_exact` for this.
@@ -486,29 +481,25 @@ pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
     assert!(ndigits > 0);
 
     let (negative, full_decoded) = decode(v);
-    let mut n = 0;
-    if let Some(part) = determine_sign(sign, &full_decoded, negative) {
-        parts[0] = part;
-        n += 1;
-    }
+    parts[0] = Part::Sign(determine_sign(sign, &full_decoded, negative));
     match full_decoded {
         FullDecoded::Nan => {
-            parts[n] = Part::Copy(if upper { b"NAN" } else { b"nan" });
-            n + 1
+            parts[1] = Part::Copy(if upper { b"NAN" } else { b"nan" });
+            2
         }
         FullDecoded::Infinite => {
-            parts[n] = Part::Copy(if upper { b"INF" } else { b"inf" });
-            n + 1
+            parts[1] = Part::Copy(if upper { b"INF" } else { b"inf" });
+            2
         }
         FullDecoded::Zero => {
             if ndigits > 1 { // [0.][0000][e0]
-                parts[n] = Part::Copy(b"0.");
-                parts[n + 1] = Part::Zero(ndigits - 1);
-                parts[n + 2] = Part::Copy(if upper { b"E0" } else { b"e0" });
-                n + 3
+                parts[1] = Part::Copy(b"0.");
+                parts[2] = Part::Zero(ndigits - 1);
+                parts[3] = Part::Copy(if upper { b"E0" } else { b"e0" });
+                4
             } else {
-                parts[n] = Part::Copy(if upper { b"0E0" } else { b"0e0" });
-                n + 1
+                parts[1] = Part::Copy(if upper { b"0E0" } else { b"0e0" });
+                2
             }
         }
         FullDecoded::Finite(ref decoded) => {
@@ -517,7 +508,7 @@ pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
 
             let trunc = if ndigits < maxlen { ndigits } else { maxlen };
             let (len, exp) = format_exact(decoded, &mut buf[..trunc], i16::MIN);
-            n + digits_to_exp_str(&buf[..len], exp, ndigits, upper, &mut parts[n..])
+            1 + digits_to_exp_str(&buf[..len], exp, ndigits, upper, &mut parts[1..])
         }
     }
 }
@@ -526,7 +517,8 @@ pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
 /// given number of fractional digits. The result is stored to the supplied parts
 /// array while utilizing given byte buffer as a scratch, and the number of
 /// parts written is returned. `upper` is only used to determine the case of
-/// non-finite values, i.e. `inf` and `nan`.
+/// non-finite values, i.e. `inf` and `nan`. The first part to be rendered is
+/// always a `Part::Sign` (which can be an empty string if no sign is rendered).
 ///
 /// `format_exact` should be the underlying digit-generation function.
 /// You probably would want `strategy::grisu::format_exact` for this.
@@ -544,28 +536,24 @@ pub fn to_exact_fixed_str<'a, T, F>(mut format_exact: F, v: T,
     assert!(parts.len() >= 5);
 
     let (negative, full_decoded) = decode(v);
-    let mut n = 0;
-    if let Some(part) = determine_sign(sign, &full_decoded, negative) {
-        parts[0] = part;
-        n += 1;
-    }
+    parts[0] = Part::Sign(determine_sign(sign, &full_decoded, negative));
     match full_decoded {
         FullDecoded::Nan => {
-            parts[n] = Part::Copy(if upper { b"NAN" } else { b"nan" });
-            n + 1
+            parts[1] = Part::Copy(if upper { b"NAN" } else { b"nan" });
+            2
         }
         FullDecoded::Infinite => {
-            parts[n] = Part::Copy(if upper { b"INF" } else { b"inf" });
-            n + 1
+            parts[1] = Part::Copy(if upper { b"INF" } else { b"inf" });
+            2
         }
         FullDecoded::Zero => {
             if frac_digits > 0 { // [0.][0000]
-                parts[n] = Part::Copy(b"0.");
-                parts[n + 1] = Part::Zero(frac_digits);
-                n + 2
+                parts[1] = Part::Copy(b"0.");
+                parts[2] = Part::Zero(frac_digits);
+                3
             } else {
-                parts[n] = Part::Copy(b"0");
-                n + 1
+                parts[1] = Part::Copy(b"0");
+                2
             }
         }
         FullDecoded::Finite(ref decoded) => {
@@ -584,15 +572,15 @@ pub fn to_exact_fixed_str<'a, T, F>(mut format_exact: F, v: T,
                 // only after the final rounding-up; it's a regular case with `exp = limit + 1`.
                 debug_assert_eq!(len, 0);
                 if frac_digits > 0 { // [0.][0000]
-                    parts[n] = Part::Copy(b"0.");
-                    parts[n + 1] = Part::Zero(frac_digits);
-                    n + 2
+                    parts[1] = Part::Copy(b"0.");
+                    parts[2] = Part::Zero(frac_digits);
+                    3
                 } else {
-                    parts[n] = Part::Copy(b"0");
-                    n + 1
+                    parts[1] = Part::Copy(b"0");
+                    2
                 }
             } else {
-                n + digits_to_dec_str(&buf[..len], exp, frac_digits, &mut parts[n..])
+                1 + digits_to_dec_str(&buf[..len], exp, frac_digits, &mut parts[1..])
             }
         }
     }
