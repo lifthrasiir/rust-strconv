@@ -57,7 +57,7 @@ pub fn decode<T: Float + 'static>(v: T) -> (/*negative?*/ bool, FullDecoded) {
                                           exp: exp, inclusive: even })
         }
         FpCategory::Normal => {
-            // XXX unfortunately `core::num::Float` does not provide a good means
+            // FIXME unfortunately `core::num::Float` does not provide a good means
             // to get the minimum normalized value...
             let minnorm = if TypeId::of::<T>() == TypeId::of::<f32>() {
                 f32::MIN_POSITIVE.integer_decode()

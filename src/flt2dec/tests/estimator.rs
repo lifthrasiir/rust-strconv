@@ -1,5 +1,5 @@
 use std::num::Float;
-use super::super::estimator::*;
+use flt2dec::estimator::*;
 
 #[test]
 fn test_estimate_scaling_factor() {

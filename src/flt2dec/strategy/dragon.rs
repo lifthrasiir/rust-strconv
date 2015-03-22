@@ -14,7 +14,7 @@ use flt2dec::estimator::estimate_scaling_factor;
 use flt2dec::bignum::Digit32 as Digit;
 use flt2dec::bignum::Big32x36 as Big;
 
-// XXX const ref to static array seems to ICE (#22540)
+// FIXME(#22540) const ref to static array seems to ICE
 static POW10: [Digit; 10] = [1, 10, 100, 1000, 10000, 100000,
                              1000000, 10000000, 100000000, 1000000000];
 static TWOPOW10: [Digit; 10] = [2, 20, 200, 2000, 20000, 200000,

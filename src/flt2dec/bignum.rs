@@ -40,7 +40,7 @@ macro_rules! impl_full_ops {
             impl FullOps for $ty {
                 fn full_add(self, other: $ty, carry: bool) -> (bool, $ty) {
                     // this cannot overflow, the output is between 0 and 2*2^nbits - 1
-                    // XXX will LLVM optimize this into ADC or similar???
+                    // FIXME will LLVM optimize this into ADC or similar???
                     let (v, carry1) = unsafe { $addfn(self, other) };
                     let (v, carry2) = unsafe { $addfn(v, if carry {1} else {0}) };
                     (carry1 || carry2, v)

@@ -136,9 +136,10 @@ pub mod strategy {
 /// The exact formula is `ceil(# bits in mantissa * log_10 2 + 1)`.
 pub const MAX_SIG_DIGITS: usize = 17;
 
-/// When d[..n] contains decimal digits, increase the last digit and propagate carry.
+/// When `d[..n]` contains decimal digits, increase the last digit and propagate carry.
 /// Returns a next digit when it causes the length change.
-fn round_up(d: &mut [u8], n: usize) -> Option<u8> {
+#[doc(hidden)]
+pub fn round_up(d: &mut [u8], n: usize) -> Option<u8> {
     match d[..n].iter().rposition(|&c| c != b'9') {
         Some(i) => { // d[i+1..n] is all nines
             d[i] += 1;
