@@ -3,6 +3,7 @@
 use core::{f32, f64};
 use core::num::{Float, FpCategory};
 use core::any::TypeId;
+use core::marker::Reflect;
 
 /// Decoded unsigned finite value, such that:
 ///
@@ -42,7 +43,7 @@ pub enum FullDecoded {
 
 /// Returns a sign (true when negative) and `FullDecoded` value
 /// from given floating point number.
-pub fn decode<T: Float + 'static>(v: T) -> (/*negative?*/ bool, FullDecoded) {
+pub fn decode<T: Float + Reflect + 'static>(v: T) -> (/*negative?*/ bool, FullDecoded) {
     let (mant, exp, sign) = v.integer_decode();
     let even = (mant & 1) == 0;
     let decoded = match v.classify() {

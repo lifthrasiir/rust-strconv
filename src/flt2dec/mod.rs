@@ -115,6 +115,7 @@ in the `tests` module. It also shows how to use individual functions.
 use core::prelude::*;
 use core::i16;
 use core::num::Float;
+use core::marker::Reflect;
 pub use self::decoder::{decode, FullDecoded, Decoded};
 
 pub mod estimator;
@@ -339,7 +340,7 @@ fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> &'static
 pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
                                  sign: Sign, frac_digits: usize, upper: bool,
                                  buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
-        where T: Float + 'static,
+        where T: Float + Reflect + 'static,
               F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     assert!(parts.len() >= 5);
     assert!(buf.len() >= MAX_SIG_DIGITS);
@@ -395,7 +396,7 @@ pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
 pub fn to_shortest_exp_str<'a, T, F>(mut format_shortest: F, v: T,
                                      sign: Sign, dec_bounds: (i16, i16), upper: bool,
                                      buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
-        where T: Float + 'static,
+        where T: Float + Reflect + 'static,
               F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     assert!(parts.len() >= 7);
     assert!(buf.len() >= MAX_SIG_DIGITS);
@@ -475,7 +476,7 @@ fn estimate_max_buf_len(exp: i16) -> usize {
 pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
                                   sign: Sign, ndigits: usize, upper: bool,
                                   buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
-        where T: Float + 'static,
+        where T: Float + Reflect + 'static,
               F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     assert!(parts.len() >= 7);
     assert!(ndigits > 0);
@@ -531,7 +532,7 @@ pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
 pub fn to_exact_fixed_str<'a, T, F>(mut format_exact: F, v: T,
                                     sign: Sign, frac_digits: usize, upper: bool,
                                     buf: &'a mut [u8], parts: &mut [Part<'a>]) -> usize
-        where T: Float + 'static,
+        where T: Float + Reflect + 'static,
               F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     assert!(parts.len() >= 5);
 

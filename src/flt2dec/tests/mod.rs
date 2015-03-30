@@ -1,6 +1,7 @@
 use std::prelude::v1::*;
 use std::{str, mem, i16, f32, f64, fmt};
 use core::num::Float;
+use core::marker::Reflect;
 use std::num::Float as StdFloat;
 use std::slice::bytes;
 use rand;
@@ -20,7 +21,7 @@ mod strategy {
     mod grisu;
 }
 
-pub fn decode_finite<T: Float + 'static>(v: T) -> Decoded {
+pub fn decode_finite<T: Float + Reflect + 'static>(v: T) -> Decoded {
     match decode(v).1 {
         FullDecoded::Finite(decoded) => decoded,
         full_decoded => panic!("expected finite, got {:?} instead", full_decoded)
@@ -83,7 +84,7 @@ macro_rules! try_fixed {
 }
 
 fn check_exact<F, T>(mut f: F, v: T, vstr: &str, expected: &[u8], expectedk: i16)
-        where T: Float + 'static,
+        where T: Float + Reflect + 'static,
               F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     // use a large enough buffer
     let mut buf = [b'_'; 1024];
@@ -151,7 +152,7 @@ fn check_exact<F, T>(mut f: F, v: T, vstr: &str, expected: &[u8], expectedk: i16
 }
 
 fn check_exact_one<F, T>(mut f: F, x: T, e: isize, tstr: &str, expected: &[u8], expectedk: i16)
-        where T: Float + StdFloat + fmt::Display + 'static,
+        where T: Float + StdFloat + Reflect + fmt::Display + 'static,
               F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     // use a large enough buffer
     let mut buf = [b'_'; 1024];
@@ -517,7 +518,7 @@ pub fn to_shortest_str_test<F>(mut f_: F)
     use super::Sign::*;
 
     fn to_string<T, F>(f: &mut F, v: T, sign: Sign, frac_digits: usize, upper: bool) -> String
-            where T: Float + StdFloat + 'static,
+            where T: Float + StdFloat + Reflect + 'static,
                   F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
         to_string_with_parts(|buf, parts| to_shortest_str(|d,b| f(d,b), v, sign,
                                                           frac_digits, upper, buf, parts))
@@ -600,7 +601,7 @@ pub fn to_shortest_exp_str_test<F>(mut f_: F)
     use super::Sign::*;
 
     fn to_string<T, F>(f: &mut F, v: T, sign: Sign, exp_bounds: (i16, i16), upper: bool) -> String
-            where T: Float + StdFloat + 'static,
+            where T: Float + StdFloat + Reflect + 'static,
                   F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
         to_string_with_parts(|buf, parts| to_shortest_exp_str(|d,b| f(d,b), v, sign,
                                                               exp_bounds, upper, buf, parts))
@@ -699,7 +700,7 @@ pub fn to_exact_exp_str_test<F>(mut f_: F)
     use super::Sign::*;
 
     fn to_string<T, F>(f: &mut F, v: T, sign: Sign, ndigits: usize, upper: bool) -> String
-            where T: Float + StdFloat + 'static,
+            where T: Float + StdFloat + Reflect + 'static,
                   F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
         to_string_with_parts(|buf, parts| to_exact_exp_str(|d,b,l| f(d,b,l), v, sign,
                                                            ndigits, upper, buf, parts))
@@ -905,7 +906,7 @@ pub fn to_exact_fixed_str_test<F>(mut f_: F)
     use super::Sign::*;
 
     fn to_string<T, F>(f: &mut F, v: T, sign: Sign, frac_digits: usize, upper: bool) -> String
-            where T: Float + StdFloat + 'static,
+            where T: Float + StdFloat + Reflect + 'static,
                   F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
         to_string_with_parts(|buf, parts| to_exact_fixed_str(|d,b,l| f(d,b,l), v, sign,
                                                              frac_digits, upper, buf, parts))
