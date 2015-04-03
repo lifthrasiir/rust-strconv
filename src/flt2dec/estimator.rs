@@ -1,7 +1,5 @@
 //! The exponent estimator.
 
-use core::num::Int;
-
 /// Finds `k_0` such that `10^(k_0-1) < mant * 2^exp <= 10^(k_0+1)`.
 ///
 /// This is used to approximate `k = ceil(log_10 (mant * 2^exp))`;

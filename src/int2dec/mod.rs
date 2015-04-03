@@ -1,6 +1,5 @@
 use core::prelude::*;
 use core::{str, fmt};
-use core::num::Int;
 
 pub use self::digits::Digit;
 pub use self::digits::{Digits64, Digits32, Digits16, Digits8};
@@ -40,7 +39,7 @@ pub struct UintToDecFunc<I, T>(pub I, pub fn(I) -> T);
 
 macro_rules! impl_uint_to_dec {
     ($t:ty, $Digits:ty, $default_conv:ident) => (
-        impl<I: Int> fmt::Display for UintToDecFunc<I, $Digits> {
+        impl fmt::Display for UintToDecFunc<$t, $Digits> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 let UintToDecFunc(num, conv) = *self;
                 let buf = conv(num);
