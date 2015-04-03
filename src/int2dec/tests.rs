@@ -1,5 +1,7 @@
 use std::prelude::v1::*;
-use std::num::{Int, NumCast};
+use std::ops::Shr;
+use std::num::NumCast;
+use std::num::wrapping::WrappingOps;
 use test;
 
 use int2dec::digits::{Digits64, Digits32, Digits16, Digits8};
@@ -43,7 +45,8 @@ pub fn u8_sanity_test<F: FnMut(u8) -> Digits8>(mut f: F) {
 }
 
 #[inline(always)]
-pub fn rotating_bench<I: Int, T, F: FnMut(I) -> T>(mut f: F, b: &mut Bencher) {
+pub fn rotating_bench<I, T, F>(mut f: F, b: &mut Bencher)
+        where I: Copy + NumCast + Shr<usize,Output=I> + WrappingOps, F: FnMut(I) -> T {
     b.iter(|| {
         // small integers (4, 5, 6, ..., 3424806)
         let mut n = NumCast::from(4).unwrap();

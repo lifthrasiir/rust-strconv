@@ -12,7 +12,7 @@ use core::marker::Reflect;
 /// - Any number from `(mant - minus) * 2^exp` to `(mant + plus) * 2^exp` will
 ///   round to the original value. The range is inclusive only when
 ///   `inclusive` is true.
-#[derive(Copy, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Decoded {
     /// The scaled mantissa.
     pub mant: u64,
@@ -29,7 +29,7 @@ pub struct Decoded {
 }
 
 /// Decoded unsigned value.
-#[derive(Copy, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FullDecoded {
     /// Not-a-number.
     Nan,

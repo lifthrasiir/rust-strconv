@@ -12,7 +12,7 @@ use core::num::{Int, Float};
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 
 /// A custom 64-bit floating point type, representing `f * 2^e`.
-#[derive(Copy, Debug)]
+#[derive(Copy, Clone, Debug)]
 #[doc(hidden)]
 pub struct Fp {
     /// The integer mantissa.
