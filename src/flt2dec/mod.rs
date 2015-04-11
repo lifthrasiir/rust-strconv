@@ -590,7 +590,7 @@ pub fn to_exact_fixed_str<'a, T, F>(mut format_exact: F, v: T,
                                     sign: Sign, frac_digits: usize, upper: bool,
                                     buf: &'a mut [u8], parts: &'a mut [Part<'a>]) -> Formatted<'a>
         where T: DecodableFloat, F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
-    assert!(parts.len() >= 5);
+    assert!(parts.len() >= 4);
 
     let (negative, full_decoded) = decode(v);
     let sign = determine_sign(sign, &full_decoded, negative);
