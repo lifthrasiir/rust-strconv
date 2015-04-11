@@ -115,9 +115,8 @@ in the `tests` module. It also shows how to use individual functions.
 use core::prelude::*;
 use core::i16;
 use core::num::Float;
-use core::marker::Reflect;
 use core::slice::bytes;
-pub use self::decoder::{decode, FullDecoded, Decoded};
+pub use self::decoder::{decode, DecodableFloat, FullDecoded, Decoded};
 
 pub mod estimator;
 pub mod bignum;
@@ -400,8 +399,7 @@ fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> &'static
 pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
                                  sign: Sign, frac_digits: usize, upper: bool,
                                  buf: &'a mut [u8], parts: &'a mut [Part<'a>]) -> Formatted<'a>
-        where T: Float + Reflect + 'static,
-              F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+        where T: DecodableFloat, F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     assert!(parts.len() >= 4);
     assert!(buf.len() >= MAX_SIG_DIGITS);
 
@@ -456,8 +454,7 @@ pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
 pub fn to_shortest_exp_str<'a, T, F>(mut format_shortest: F, v: T,
                                      sign: Sign, dec_bounds: (i16, i16), upper: bool,
                                      buf: &'a mut [u8], parts: &'a mut [Part<'a>]) -> Formatted<'a>
-        where T: Float + Reflect + 'static,
-              F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
+        where T: DecodableFloat, F: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
     assert!(parts.len() >= 6);
     assert!(buf.len() >= MAX_SIG_DIGITS);
     assert!(dec_bounds.0 <= dec_bounds.1);
@@ -536,8 +533,7 @@ fn estimate_max_buf_len(exp: i16) -> usize {
 pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
                                   sign: Sign, ndigits: usize, upper: bool,
                                   buf: &'a mut [u8], parts: &'a mut [Part<'a>]) -> Formatted<'a>
-        where T: Float + Reflect + 'static,
-              F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+        where T: DecodableFloat, F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     assert!(parts.len() >= 6);
     assert!(ndigits > 0);
 
@@ -593,8 +589,7 @@ pub fn to_exact_exp_str<'a, T, F>(mut format_exact: F, v: T,
 pub fn to_exact_fixed_str<'a, T, F>(mut format_exact: F, v: T,
                                     sign: Sign, frac_digits: usize, upper: bool,
                                     buf: &'a mut [u8], parts: &'a mut [Part<'a>]) -> Formatted<'a>
-        where T: Float + Reflect + 'static,
-              F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
+        where T: DecodableFloat, F: FnMut(&Decoded, &mut [u8], i16) -> (usize, i16) {
     assert!(parts.len() >= 5);
 
     let (negative, full_decoded) = decode(v);

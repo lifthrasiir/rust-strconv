@@ -2,8 +2,6 @@
 
 use core::{f32, f64};
 use core::num::{Float, FpCategory};
-use core::any::TypeId;
-use core::marker::Reflect;
 
 /// Decoded unsigned finite value, such that:
 ///
@@ -41,9 +39,23 @@ pub enum FullDecoded {
     Finite(Decoded),
 }
 
+/// A floating point type which can be `decode`d.
+pub trait DecodableFloat: Float {
+    /// The minimum positive normalized value.
+    fn min_pos_norm_value() -> Self;
+}
+
+impl DecodableFloat for f32 {
+    fn min_pos_norm_value() -> Self { f32::MIN_POSITIVE }
+}
+
+impl DecodableFloat for f64 {
+    fn min_pos_norm_value() -> Self { f64::MIN_POSITIVE }
+}
+
 /// Returns a sign (true when negative) and `FullDecoded` value
 /// from given floating point number.
-pub fn decode<T: Float + Reflect + 'static>(v: T) -> (/*negative?*/ bool, FullDecoded) {
+pub fn decode<T: DecodableFloat>(v: T) -> (/*negative?*/ bool, FullDecoded) {
     let (mant, exp, sign) = v.integer_decode();
     let even = (mant & 1) == 0;
     let decoded = match v.classify() {
@@ -58,16 +70,7 @@ pub fn decode<T: Float + Reflect + 'static>(v: T) -> (/*negative?*/ bool, FullDe
                                           exp: exp, inclusive: even })
         }
         FpCategory::Normal => {
-            // FIXME unfortunately `core::num::Float` does not provide a good means
-            // to get the minimum normalized value...
-            let minnorm = if TypeId::of::<T>() == TypeId::of::<f32>() {
-                f32::MIN_POSITIVE.integer_decode()
-            } else if TypeId::of::<T>() == TypeId::of::<f64>() {
-                f64::MIN_POSITIVE.integer_decode()
-            } else {
-                unreachable!()
-            };
-
+            let minnorm = <T as DecodableFloat>::min_pos_norm_value().integer_decode();
             if mant == minnorm.0 && exp == minnorm.1 {
                 // (maxmant, exp - 1) -- (minnormmant, exp) -- (minnormmant + 1, exp)
                 // where maxmant = minnormmant * 2 - 1
