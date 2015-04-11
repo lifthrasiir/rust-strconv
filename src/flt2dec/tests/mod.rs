@@ -7,7 +7,7 @@ use std::slice::bytes;
 use rand;
 use rand::distributions::{IndependentSample, Range};
 
-use flt2dec::{decode, FullDecoded, Decoded, MAX_SIG_DIGITS, round_up, Part, Sign};
+use flt2dec::{decode, FullDecoded, Decoded, MAX_SIG_DIGITS, round_up, Part, Formatted, Sign};
 use flt2dec::{to_shortest_str, to_shortest_exp_str, to_exact_exp_str, to_exact_fixed_str};
 
 pub use test::Bencher;
@@ -496,21 +496,15 @@ pub fn f32_exhaustive_equivalence_test<F, G>(f: F, g: G, k: usize)
 }
 
 fn to_string_with_parts<F>(mut f: F) -> String
-        where F: for<'a, 'b> FnMut(&'a mut [u8], &'b mut [Part<'a>]) -> usize {
+        where F: for<'a> FnMut(&'a mut [u8], &'a mut [Part<'a>]) -> Formatted<'a> {
     use std::{str, iter};
 
     let mut buf = [0; 1024];
     let mut parts = [Part::Zero(0); 16];
-    let nparts = f(&mut buf, &mut parts);
-    let mut ret = String::new();
-    for part in &parts[..nparts] {
-        match *part {
-            Part::Num(v) => ret.push_str(&format!("{}", v)),
-            Part::Zero(nzeroes) => ret.extend(iter::repeat('0').take(nzeroes)),
-            Part::Sign(buf) | Part::Copy(buf) => ret.push_str(str::from_utf8(buf).unwrap()),
-        }
-    }
-    ret
+    let formatted = f(&mut buf, &mut parts);
+    let mut ret = vec![0; formatted.len()];
+    assert_eq!(formatted.write(&mut ret), Some(ret.len()));
+    String::from_utf8(ret).unwrap()
 }
 
 pub fn to_shortest_str_test<F>(mut f_: F)
