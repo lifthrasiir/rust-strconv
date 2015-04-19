@@ -353,16 +353,17 @@ fn digits_to_exp_str<'a>(buf: &'a [u8], exp: i16, min_ndigits: usize, upper: boo
     &parts[..n + 2]
 }
 
-/// Sign formatting modes.
+/// Sign formatting options.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Sign {
     /// Prints `-` only for the negative non-zero values.
-    Minus,        // -1  0  0  1
+    Minus,        // -inf -1  0  0  1  inf nan
+    /// Prints `-` only for any negative values (including the negative zero).
+    MinusRaw,     // -inf -1  0  0  1  inf nan
     /// Prints `-` for the negative non-zero values, or `+` otherwise.
-    MinusPlus,    // -1 +0 +0 +1
-    /// Prints `-` for any negative values (including the negative zero),
-    /// or `+` otherwise. It treats all NaN as positives though.
-    MinusPlusRaw, // -1 -0 +0 +1
+    MinusPlus,    // -inf -1 +0 +0 +1 +inf nan
+    /// Prints `-` for any negative values (including the negative zero), or `+` otherwise.
+    MinusPlusRaw, // -inf -1 -0 +0 +1 +inf nan
 }
 
 /// Returns the static byte string corresponding to the sign to be formatted.
@@ -371,9 +372,10 @@ fn determine_sign(sign: Sign, decoded: &FullDecoded, negative: bool) -> &'static
     match (*decoded, sign) {
         (FullDecoded::Nan, _) => b"",
         (FullDecoded::Zero, Sign::Minus) => b"",
+        (FullDecoded::Zero, Sign::MinusRaw) => if negative { b"-" } else { b"" },
         (FullDecoded::Zero, Sign::MinusPlus) => b"+",
         (FullDecoded::Zero, Sign::MinusPlusRaw) => if negative { b"-" } else { b"+" },
-        (_, Sign::Minus) => if negative { b"-" } else { b"" },
+        (_, Sign::Minus) | (_, Sign::MinusRaw) => if negative { b"-" } else { b"" },
         (_, Sign::MinusPlus) | (_, Sign::MinusPlusRaw) => if negative { b"-" } else { b"+" },
     }
 }
