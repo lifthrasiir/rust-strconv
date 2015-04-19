@@ -454,7 +454,7 @@ fn iterate<F, G, V>(func: &str, k: usize, n: usize, mut f: F, mut g: G, mut v: V
 pub fn f32_random_equivalence_test<F, G>(f: F, g: G, k: usize, n: usize)
         where F: FnMut(&Decoded, &mut [u8]) -> Option<(usize, i16)>,
               G: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
-    let mut rng = rand::weak_rng();
+    let mut rng: rand::XorShiftRng = rand::Rand::rand(&mut rand::thread_rng());
     let f32_range = Range::new(0x0000_0001u32, 0x7f80_0000);
     iterate("f32_random_equivalence_test", k, n, f, g, |_| {
         let i: u32 = f32_range.ind_sample(&mut rng);
@@ -466,7 +466,7 @@ pub fn f32_random_equivalence_test<F, G>(f: F, g: G, k: usize, n: usize)
 pub fn f64_random_equivalence_test<F, G>(f: F, g: G, k: usize, n: usize)
         where F: FnMut(&Decoded, &mut [u8]) -> Option<(usize, i16)>,
               G: FnMut(&Decoded, &mut [u8]) -> (usize, i16) {
-    let mut rng = rand::weak_rng();
+    let mut rng: rand::XorShiftRng = rand::Rand::rand(&mut rand::thread_rng());
     let f64_range = Range::new(0x0000_0000_0000_0001u64, 0x7ff0_0000_0000_0000);
     iterate("f64_random_equivalence_test", k, n, f, g, |_| {
         let i: u64 = f64_range.ind_sample(&mut rng);
