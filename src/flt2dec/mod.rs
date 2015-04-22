@@ -83,7 +83,7 @@ Both implementations expose two public functions:
 
 They try to fill the `u8` buffer with digits and returns the number of digits
 written and the exponent `k`. They are total for all finite `f32` and `f64`
-inputs (Grisu internally falls back to Dragon if possible).
+inputs (Grisu internally falls back to Dragon if necessary).
 
 The rendered digits are formatted into the actual string form with
 four functions:
@@ -104,8 +104,8 @@ four functions:
 They all return a slice of preallocated `Part` array, which corresponds to
 the individual part of strings: a fixed string, a part of rendered digits,
 a number of zeroes or a small (`u16`) number. The caller is expected to
-provide an enough buffer and `Part` array, and to assemble the final
-string from parts itself.
+provide a large enough buffer and `Part` array, and to assemble the final
+string from resulting `Part`s itself.
 
 All algorithms and formatting functions are accompanied by extensive tests
 in the `tests` module. It also shows how to use individual functions.
@@ -360,7 +360,7 @@ pub enum Sign {
     /// Prints `-` only for the negative non-zero values.
     Minus,        // -inf -1  0  0  1  inf nan
     /// Prints `-` only for any negative values (including the negative zero).
-    MinusRaw,     // -inf -1  0  0  1  inf nan
+    MinusRaw,     // -inf -1 -0  0  1  inf nan
     /// Prints `-` for the negative non-zero values, or `+` otherwise.
     MinusPlus,    // -inf -1 +0 +0 +1 +inf nan
     /// Prints `-` for any negative values (including the negative zero), or `+` otherwise.
@@ -626,9 +626,8 @@ pub fn to_exact_fixed_str<'a, T, F>(mut format_exact: F, v: T,
             let limit = if frac_digits < 0x8000 { -(frac_digits as i16) } else { i16::MIN };
             let (len, exp) = format_exact(decoded, &mut buf[..maxlen], limit);
             if exp <= limit {
-                // `format_exact` always returns at least one digit even though the restriction
-                // hasn't been met, so we catch this condition and treats as like zeroes.
-                // this does not include the case that the restriction has been met
+                // the restriction couldn't been met, so this should render like zero no matter
+                // `exp` was. this does not include the case that the restriction has been met
                 // only after the final rounding-up; it's a regular case with `exp = limit + 1`.
                 debug_assert_eq!(len, 0);
                 if frac_digits > 0 { // [0.][0000]
