@@ -1,4 +1,4 @@
-use std::num::Float;
+use std::f64;
 use flt2dec::estimator::*;
 
 #[test]
@@ -44,7 +44,7 @@ fn test_estimate_scaling_factor() {
     assert_almost_eq!(estimate_scaling_factor(0x1fffffffffffff, 971), 309);
 
     for i in -1074..972 {
-        let expected = Float::ldexp(1.0, i).log10().ceil();
+        let expected = f64::ldexp(1.0, i).log10().ceil();
         assert_almost_eq!(estimate_scaling_factor(1, i as i16), expected as i16);
     }
 }
