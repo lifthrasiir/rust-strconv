@@ -6,7 +6,7 @@ Almost direct (but slightly optimized) Rust translation of Figure 3 of [1].
 */
 
 use core::prelude::*;
-use core::num::{Int, Float};
+use core::num::Float;
 use core::cmp::Ordering;
 
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};

@@ -15,7 +15,7 @@
  */
 
 #![feature(no_std, core)] // lib stability features as per RFC #507
-#![cfg_attr(test, feature(std_misc, libc, test))] // ditto
+#![cfg_attr(test, feature(std_misc, libc, zero_one, test))] // ditto
 #![no_std]
 
 #[macro_use] extern crate core;

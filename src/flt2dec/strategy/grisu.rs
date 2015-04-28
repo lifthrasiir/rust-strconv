@@ -7,7 +7,7 @@ Rust adaptation of Grisu3 algorithm described in [1]. It uses about
 */
 
 use core::prelude::*;
-use core::num::{Int, Float};
+use core::num::Float;
 
 use flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
 

@@ -1,7 +1,7 @@
 use std::prelude::v1::*;
-use std::ops::Shr;
-use std::num::NumCast;
-use std::num::wrapping::WrappingOps;
+use std::ops::{Add, Shr};
+use std::num::One;
+use std::num::wrapping::OverflowingOps;
 use test;
 
 use int2dec::digits::{Digits64, Digits32, Digits16, Digits8};
@@ -46,20 +46,26 @@ pub fn u8_sanity_test<F: FnMut(u8) -> Digits8>(mut f: F) {
 
 #[inline(always)]
 pub fn rotating_bench<I, T, F>(mut f: F, b: &mut Bencher)
-        where I: Copy + NumCast + Shr<usize,Output=I> + WrappingOps, F: FnMut(I) -> T {
+        where I: Copy + One + Add<I,Output=I> + Shr<usize,Output=I> + OverflowingOps,
+        F: FnMut(I) -> T {
+    // XXX ugh.
+    let _1 = One::one();
+    let _3 = _1 + _1 + _1;
+    let _4 = _1 + _1 + _1 + _1;
+
     b.iter(|| {
         // small integers (4, 5, 6, ..., 3424806)
-        let mut n = NumCast::from(4).unwrap();
+        let mut n = _4;
         for _ in 0..64 {
             test::black_box(f(n));
-            n = n.wrapping_add(n >> 2);
+            n = n.overflowing_add(n >> 2).0;
         }
 
         // large integers
-        let mut n = NumCast::from(1).unwrap();
+        let mut n = _1;
         for _ in 0..64 {
             test::black_box(f(n));
-            n = n.wrapping_mul(NumCast::from(3).unwrap());
+            n = n.overflowing_mul(_3).0;
         }
     });
 }
