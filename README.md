@@ -90,6 +90,9 @@ Strategy | `u8` | `u16` | `u32` | `u64`
 
 ## `flt2dec`
 
+**Note: This is now on the tree (rust-lang/rust#24612)!
+This part of code remains available in the public domain for other uses.**
+
 Floating point number to decimal string for the valid representation (i.e. rounds to
 the original value when converted back). In progress.
 

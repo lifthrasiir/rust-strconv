@@ -261,7 +261,7 @@ fn digits_to_dec_str<'a>(buf: &'a [u8], exp: i16, frac_digits: usize,
 
     // if there is the restriction on the last digit position, `buf` is assumed to be
     // left-padded with the virtual zeroes. the number of virtual zeroes, `nzeroes`,
-    // equals to `max(0, exp + frag_digits - buf.len())`, so that the position of
+    // equals to `max(0, exp + frac_digits - buf.len())`, so that the position of
     // the last digit `exp - buf.len() - nzeroes` is no more than `-frac_digits`:
     //
     //                       |<-virtual->|
