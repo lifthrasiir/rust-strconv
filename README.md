@@ -1,5 +1,9 @@
 # Rust-strconv
 
+[![Rust-strconv on Travis CI][travis-image]][travis]
+
+[travis-image]: https://travis-ci.org/lifthrasiir/rust-strconv.png
+
 Experimental string-to-number and number-to-string conversion libraries and benchmarks for Rust.
 
 ## Notes
